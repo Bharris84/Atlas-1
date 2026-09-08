@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-ai-agents"
+version = "0.1.0"
+description = "Provider-agnostic AI agents for Atlas. Interpret numbers, never produce them."
+requires-python = ">=3.10"
+license = { text = "UNLICENSED" }
+dependencies = ["atlas-financial-engine"]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.30"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

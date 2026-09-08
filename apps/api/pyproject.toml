@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-api"
+version = "0.1.0"
+description = "Atlas FastAPI backend"
+requires-python = ">=3.10"
+license = { text = "UNLICENSED" }
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "sqlalchemy>=2.0",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "pyjwt>=2.8",
+    "httpx>=0.26",
+    "atlas-financial-engine",
+    "atlas-scoring-engine",
+    "atlas-data-providers",
+    "atlas-ai-agents",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.1"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "httpx>=0.26"]
+
+[tool.setuptools.packages.find]
+include = ["atlas_api*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

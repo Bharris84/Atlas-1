@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atlas-data-providers"
+version = "0.1.0"
+description = "Property data provider abstraction for Atlas (RentCast, ATTOM, ...)"
+requires-python = ">=3.10"
+license = { text = "UNLICENSED" }
+dependencies = ["httpx>=0.26"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
