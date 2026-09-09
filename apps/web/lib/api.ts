@@ -16,6 +16,7 @@ import type {
   Dashboard,
   Lead,
   Offer,
+  Owner,
   Property,
   PropertySummary,
   RehabProject,
@@ -160,6 +161,13 @@ export const api = {
     request<AnalysisResponse>(`/api/analyses/${id}/ai`, { method: "POST" }),
 
   // --- Related records ----------------------------------------------------
+  listOwners: (propertyId: string) =>
+    request<Owner[]>(`/api/properties/${propertyId}/owners`),
+  createOwner: (propertyId: string, body: Partial<Owner>) =>
+    request<Owner>(`/api/properties/${propertyId}/owners`, {
+      method: "POST",
+      ...json(body),
+    }),
   listComps: (propertyId: string) =>
     request<Comp[]>(`/api/properties/${propertyId}/comps`),
   createComp: (propertyId: string, body: Partial<Comp>) =>

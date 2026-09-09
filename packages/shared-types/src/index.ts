@@ -396,6 +396,25 @@ export interface Lead {
   updated_at: string;
 }
 
+/**
+ * Ownership facts as recorded — observations, never inferences about
+ * motivation. Absentee ownership and high equity are classifications of a
+ * situation, not evidence that someone wants to sell.
+ */
+export interface Owner {
+  id: string;
+  property_id: string;
+  owner_name: string | null;
+  entity_type: string | null;
+  mailing_address: string | null;
+  ownership_start_date: string | null;
+  estimated_equity: Money | null;
+  estimated_mortgage: Money | null;
+  occupancy_indicator: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface Comp {
   id: string;
   property_id: string;

@@ -33,6 +33,7 @@ import type {
   AssumptionAudit,
   Comp,
   Communication,
+  Owner,
   Property,
 } from "@atlas/shared-types";
 
@@ -285,13 +286,13 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function OwnerTab({ propertyId }: { propertyId: string }) {
-  const [owners, setOwners] = useState<any[] | null>(null);
+  const [owners, setOwners] = useState<Owner[] | null>(null);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/properties/${propertyId}/owners`)
-      .then((response) => response.json())
-      .then(setOwners)
-      .catch(() => setOwners([]));
+    // Must go through the API client: it attaches the Supabase bearer token.
+    // A bare fetch() here works only under development auth and 401s the
+    // moment real authentication is enabled.
+    api.listOwners(propertyId).then(setOwners).catch(() => setOwners([]));
   }, [propertyId]);
 
   if (!owners) return <LoadingState />;

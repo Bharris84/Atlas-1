@@ -1,3 +1,18 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.name='fetch']",
+        "message": "Use the client in lib/api.ts. A bare fetch() skips the Supabase bearer token, which works under development auth and 401s in production."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["lib/api.ts"],
+      "rules": { "no-restricted-syntax": "off" }
+    }
+  ]
 }

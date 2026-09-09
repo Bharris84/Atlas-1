@@ -14,7 +14,6 @@ from atlas_financial_engine import (
     Assumptions,
     CapitalEfficiencyPreference,
     DealInputs,
-    EARLY_STAGE_PROFILE,
     InvestorProfile,
     RiskTolerance,
     Strategy,
@@ -133,9 +132,8 @@ class TestSerialization:
     def test_json_serialisable(self):
         import json
 
-        assert json.loads(json.dumps(EARLY_STAGE_PROFILE.to_dict()))["risk_tolerance"] == (
-            "moderate"
-        )
+        payload = InvestorProfile(available_capital=D("50000")).to_dict()
+        assert json.loads(json.dumps(payload))["risk_tolerance"] == "moderate"
 
 
 class TestIntegrationWithDealInputs:
@@ -192,10 +190,30 @@ class TestIntegrationWithDealInputs:
         )
 
 
-class TestProvisionalProfile:
-    def test_the_shipped_profile_is_labelled_provisional(self):
+class TestNoDefaultProfileShips:
+    """Atlas must ship no populated investor profile.
+
+    A constant carrying example capital figures is a liability: anyone reading
+    the codebase could mistake an illustration for the operator's real
+    position, and an underwriting tool that appears to know your balance sheet
+    when it does not is worse than one that admits it does not.
+    """
+
+    def test_no_populated_profile_constant_is_exported(self):
+        import atlas_financial_engine as engine
+
+        for name in dir(engine):
+            value = getattr(engine, name)
+            if isinstance(value, InvestorProfile):
+                assert not value.is_stated, (
+                    f"{name} ships populated capital figures; Atlas must not "
+                    "imply knowledge of the investor's position"
+                )
+
+    def test_the_default_profile_states_nothing(self):
+        assert InvestorProfile().is_stated is False
+
+    def test_the_provisional_note_still_exists_for_user_entered_profiles(self):
         from atlas_financial_engine import PROVISIONAL_PROFILE_NOTE
 
         assert "Provisional" in PROVISIONAL_PROFILE_NOTE
-        assert EARLY_STAGE_PROFILE.name is not None
-        assert "provisional" in EARLY_STAGE_PROFILE.name.lower()

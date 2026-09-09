@@ -183,18 +183,9 @@ def _serialize(value: Any) -> Any:
     return value
 
 
-# A starting point for an early-stage, capital-constrained operator: enough
-# capital to wholesale and to take one modest flip, not enough to hold much.
-# Provisional. Replace with the investor's real figures.
-EARLY_STAGE_PROFILE = InvestorProfile(
-    name="Early stage (provisional)",
-    available_capital=D("50000"),
-    max_capital_deployment=D("35000"),
-    preferred_minimum_cash_flow=D("300"),
-    minimum_roi=D("0.20"),
-    max_cash_left_in_deal=D("25000"),
-    minimum_wholesale_assignment=D("10000"),
-    risk_tolerance=RiskTolerance.MODERATE,
-    capital_efficiency_preference=CapitalEfficiencyPreference.MAXIMIZE_VELOCITY,
-    preferred_strategies=[],
-)
+# Atlas deliberately ships NO populated default investor profile.
+#
+# A constant carrying example capital figures was removed: anyone grepping the
+# codebase would find concrete dollar amounts and could reasonably mistake them
+# for the operator's real position. An unstated profile is unknown, and Atlas
+# reports it as unknown rather than substituting an illustration.

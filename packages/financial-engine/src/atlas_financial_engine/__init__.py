@@ -50,7 +50,6 @@ from .enums import (
 from .inputs import DealInputs, PropertyFacts, build_inputs
 from .investor import (
     CapitalEfficiencyPreference,
-    EARLY_STAGE_PROFILE,
     InvestorProfile,
     PROVISIONAL_PROFILE_NOTE,
     RiskTolerance,
@@ -89,7 +88,6 @@ __all__ = [
     "calibrate_from_dicts",
     "CapitalEfficiency",
     "CapitalEfficiencyPreference",
-    "EARLY_STAGE_PROFILE",
     "InvestorProfile",
     "PROVISIONAL_PROFILE_NOTE",
     "ProfitHorizon",
