@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900;
+  }
+
+  /* Financial figures are compared column to column constantly, so they are
+     tabular everywhere. Proportional digits make columns of numbers jitter. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-ink-200 bg-white shadow-sm;
+  }
+
+  .card-header {
+    @apply flex items-center justify-between gap-3 border-b border-ink-200 px-4 py-3;
+  }
+
+  .card-title {
+    @apply text-sm font-semibold text-ink-900;
+  }
+
+  .label {
+    @apply block text-xs font-medium uppercase tracking-wide text-ink-500;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-sm
+           text-ink-900 shadow-sm outline-none transition
+           placeholder:text-ink-400
+           focus:border-ink-500 focus:ring-2 focus:ring-ink-200;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-2
+           text-sm font-medium transition disabled:cursor-not-allowed
+           disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-ink-900 text-white hover:bg-ink-800;
+  }
+
+  .btn-secondary {
+    @apply btn border border-ink-300 bg-white text-ink-700 hover:bg-ink-100;
+  }
+
+  .btn-danger {
+    @apply btn border border-fail-500 bg-white text-fail-600 hover:bg-fail-50;
+  }
+
+  .table {
+    @apply w-full text-sm;
+  }
+
+  .table th {
+    @apply px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink-500;
+  }
+
+  .table td {
+    @apply border-t border-ink-100 px-3 py-2 text-ink-800;
+  }
+}

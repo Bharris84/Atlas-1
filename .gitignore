@@ -40,3 +40,7 @@ blob-report/
 .idea/
 .vscode/
 *.swp
+
+# Local test databases
+atlas-e2e.db
+atlas-demo.db
