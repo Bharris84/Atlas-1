@@ -161,6 +161,68 @@ export interface AiAnalysis {
   strategist: AgentOutput;
 }
 
+/**
+ * Capital efficiency — how hard each dollar of capital works, and for how long
+ * it is stuck. Provisional and additive: it is reported next to the ranking and
+ * does NOT feed the ranking or the deal score.
+ *
+ * `inputs` and `formula` exist so a user can recompute the score by hand.
+ */
+export interface CapitalEfficiency {
+  strategy: StrategyKey;
+  /** Transactional profit lands once at exit; annual income repeats yearly. */
+  horizon: "transactional" | "annual_income";
+  horizon_months: number | null;
+  capital_deployed: Money | null;
+  profit: Money | null;
+  return_on_capital: Ratio | null;
+  /** Times per year the capital could turn over. */
+  capital_velocity: Ratio | null;
+  annualized_return_on_capital: Ratio | null;
+  profit_per_1k_deployed: Money | null;
+  capital_recycled_percent: Ratio | null;
+  share_of_available_capital: Ratio | null;
+  /** Affordability, kept separate from efficiency. Null means unknown. */
+  within_capital_limit: boolean | null;
+  capital_ceiling: Money | null;
+  capital_free: boolean;
+  computable: boolean;
+  score: Ratio | null;
+  score_target: Ratio | null;
+  formula: string;
+  notes: string[];
+  inputs: Record<string, string | null>;
+  confidence: Confidence;
+  provisional: boolean;
+}
+
+export type RiskTolerance = "conservative" | "moderate" | "aggressive";
+
+export type CapitalEfficiencyPreference =
+  | "maximize_velocity"
+  | "balanced"
+  | "maximize_absolute_profit";
+
+/**
+ * Describes the INVESTOR, not the deal — capital available, return
+ * requirements, risk tolerance. Deliberately separate from the buy box.
+ *
+ * A null figure means unstated, never zero. An investor who has not said what
+ * capital they have does not have no capital.
+ */
+export interface InvestorProfile {
+  name: string | null;
+  available_capital: Money | null;
+  max_capital_deployment: Money | null;
+  preferred_minimum_cash_flow: Money | null;
+  minimum_roi: Ratio | null;
+  max_cash_left_in_deal: Money | null;
+  minimum_wholesale_assignment: Money | null;
+  risk_tolerance: RiskTolerance;
+  capital_efficiency_preference: CapitalEfficiencyPreference;
+  preferred_strategies: StrategyKey[];
+}
+
 export interface AnalysisResponse {
   id?: string | null;
   property_id?: string | null;
@@ -175,6 +237,7 @@ export interface AnalysisResponse {
   overall_confidence: Confidence;
   missing_information: string[];
   scoring: DealScore;
+  capital_efficiency: Record<StrategyKey, CapitalEfficiency>;
   ai_analysis: AiAnalysis | null;
   engine_version: string;
   created_at?: string | null;
@@ -207,6 +270,7 @@ export interface AnalysisRequest {
   property_facts?: Record<string, unknown> | null;
   evidence?: Partial<Evidence> | null;
   assumptions?: Record<string, unknown> | null;
+  investor_profile?: Partial<InvestorProfile> | null;
   risk_flags?: string[];
   include_ai?: boolean;
   name?: string | null;
@@ -399,7 +463,9 @@ export interface UserSettings {
   email: string | null;
   display_name: string | null;
   default_assumptions: Record<string, any>;
+  investor_profile: InvestorProfile;
   provisional_defaults_note: string;
+  provisional_profile_note: string;
 }
 
 export interface PipelineBucket {

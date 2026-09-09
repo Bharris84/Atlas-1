@@ -1,0 +1,116 @@
+{
+  "_README": [
+    "THESE THREE DEALS ARE HYPOTHETICAL. Every figure was invented to demonstrate",
+    "the calibration method. They are NOT real transactions, NOT market data, and",
+    "NOTHING should be concluded about Atlas's accuracy from them.",
+    "",
+    "Copy this file to calibration/deals.json and replace it with deals you",
+    "actually know the outcome of. Three is the minimum that shows a pattern;",
+    "it is not enough to prove one.",
+    "",
+    "'inputs' is what you would have entered in Atlas BEFORE the deal.",
+    "'actual' is what really happened. actual_profit must be on the same basis",
+    "as the executed strategy: an exit profit for wholesale and flip, an annual",
+    "cash flow for buy & hold, BRRRR and seller finance."
+  ],
+  "deals": [
+    {
+      "name": "HYPOTHETICAL 1 \u2014 flip where the ARV came in low",
+      "description": "Underwritten at a $250k ARV from three comps; sold for $232k after sitting an extra two months, and lost money.",
+      "inputs": {
+        "purchase_price": "150000",
+        "arv": "250000",
+        "rehab": "45000",
+        "monthly_rent": "1800",
+        "evidence": {
+          "arv_basis": "comparable_sales",
+          "comp_count": 3,
+          "average_comp_similarity": "0.72",
+          "average_comp_age_days": 150,
+          "rehab_basis": "contractor_bid",
+          "property_visited": true
+        },
+        "assumptions": {
+          "holding": {
+            "annual_taxes": "2400",
+            "annual_insurance": "1800"
+          },
+          "rental": {
+            "annual_taxes": "2400",
+            "annual_insurance": "1800"
+          }
+        }
+      },
+      "actual": {
+        "strategy_executed": "flip",
+        "actual_profit": "-18300",
+        "actual_sale_price": "232000",
+        "actual_rehab": "47500",
+        "actual_holding_months": 8,
+        "notes": "Sold below the underwritten ARV and took two extra months. A $2,500 buyer credit at closing is not modelled by Atlas and shows up as the residual."
+      }
+    },
+    {
+      "name": "HYPOTHETICAL 2 \u2014 wholesale assignment that held up",
+      "description": "Contracted at $78k against a $205k ARV. Assigned, but for less than the model said the spread supported.",
+      "inputs": {
+        "purchase_price": "78000",
+        "arv": "205000",
+        "rehab": "40000",
+        "evidence": {
+          "arv_basis": "comparable_sales",
+          "comp_count": 5,
+          "average_comp_similarity": "0.86",
+          "average_comp_age_days": 70,
+          "rehab_basis": "walkthrough",
+          "property_visited": true
+        },
+        "assumptions": {
+          "holding": {
+            "annual_taxes": "1900",
+            "annual_insurance": "1500"
+          }
+        }
+      },
+      "actual": {
+        "strategy_executed": "wholesale",
+        "actual_profit": "11000",
+        "actual_sale_price": "205000",
+        "actual_rehab": "44000",
+        "notes": "Assignment closed at $11,000 against a modelled $14,739. The buyer's own rehab number was higher than ours, and they negotiated the fee down."
+      }
+    },
+    {
+      "name": "HYPOTHETICAL 3 \u2014 rental where the expenses were understated",
+      "description": "Bought as a hold. Rent came in as expected, operating costs did not.",
+      "inputs": {
+        "purchase_price": "118000",
+        "arv": "150000",
+        "rehab": "12000",
+        "monthly_rent": "1350",
+        "evidence": {
+          "arv_basis": "automated_valuation",
+          "rehab_basis": "walkthrough",
+          "rent_basis": "rental_comps",
+          "property_visited": true
+        },
+        "assumptions": {
+          "rental": {
+            "annual_taxes": "1500",
+            "annual_insurance": "1600"
+          },
+          "holding": {
+            "annual_taxes": "1500",
+            "annual_insurance": "1600"
+          }
+        }
+      },
+      "actual": {
+        "strategy_executed": "buy_hold",
+        "actual_profit": "1850",
+        "actual_monthly_rent": "1325",
+        "notes": "Annual cash flow, not exit profit. Rent came in slightly under, and a first-year roof repair exceeded the maintenance reserve."
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
   RiskPanel,
   ScorePanel,
 } from "@/components/AnalysisPanels";
+import { CapitalEfficiencyPanel } from "@/components/CapitalEfficiencyPanel";
 import {
   AssumptionsPanel,
   DealInputsPanel,
@@ -83,6 +84,7 @@ export function AnalysisWorkspace({
                 <MissingInfoPanel analysis={analysis} />
               </div>
             </div>
+            <CapitalEfficiencyPanel analysis={analysis} />
             <RiskPanel scoring={analysis.scoring} />
             <AiPanel analysis={analysis} />
             <p className="text-center text-[11px] text-ink-400">

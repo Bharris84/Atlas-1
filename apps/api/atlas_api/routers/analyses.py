@@ -22,7 +22,12 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser, get_current_user
 from ..config import Settings, get_settings
 from ..db import get_db
-from ..deps import get_owned_analysis, get_owned_property, user_default_assumptions
+from ..deps import (
+    get_owned_analysis,
+    get_owned_property,
+    user_default_assumptions,
+    user_investor_profile,
+)
 from ..models import AssumptionAudit, DealAnalysis, Property
 from ..schemas import (
     AnalysisRequest,
@@ -51,6 +56,7 @@ def analyze(
     user: CurrentUser = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     defaults: Optional[Dict[str, Any]] = Depends(user_default_assumptions),
+    profile: Optional[Dict[str, Any]] = Depends(user_investor_profile),
 ) -> AnalysisResponse:
     """Underwrite a set of numbers without saving anything.
 
@@ -58,7 +64,9 @@ def analyze(
     marked not viable with the reason and the missing fields, rather than
     silently returning zeros.
     """
-    inputs = build_deal_inputs(request.model_dump(exclude={"include_ai"}), defaults)
+    inputs = build_deal_inputs(
+        request.model_dump(exclude={"include_ai"}), defaults, investor_profile=profile
+    )
     comparison, scoring, ai_output = run_analysis(inputs, request.include_ai, settings)
     return AnalysisResponse(**build_response_payload(inputs, comparison, scoring, ai_output))
 
@@ -75,10 +83,11 @@ def create_analysis(
     user: CurrentUser = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     defaults: Optional[Dict[str, Any]] = Depends(user_default_assumptions),
+    profile: Optional[Dict[str, Any]] = Depends(user_investor_profile),
 ) -> AnalysisResponse:
     """Run and save an analysis against a property."""
     payload = request.model_dump(exclude={"include_ai", "name", "change_reason"})
-    inputs = build_deal_inputs(payload, defaults, property_row)
+    inputs = build_deal_inputs(payload, defaults, property_row, investor_profile=profile)
     comparison, scoring, ai_output = run_analysis(inputs, request.include_ai, settings)
 
     analysis = DealAnalysis(
@@ -151,13 +160,14 @@ def update_analysis(
     user: CurrentUser = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
     defaults: Optional[Dict[str, Any]] = Depends(user_default_assumptions),
+    profile: Optional[Dict[str, Any]] = Depends(user_investor_profile),
 ) -> AnalysisResponse:
     """Re-underwrite a saved analysis, recording what changed and why."""
     property_row = db.get(Property, analysis.property_id)
     previous_inputs = analysis.inputs_json
 
     payload = request.model_dump(exclude={"include_ai", "name", "change_reason"})
-    inputs = build_deal_inputs(payload, defaults, property_row)
+    inputs = build_deal_inputs(payload, defaults, property_row, investor_profile=profile)
     comparison, scoring, ai_output = run_analysis(inputs, request.include_ai, settings)
 
     if request.name:

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Mapping, Optional
 from .assumptions import Assumptions
 from .confidence import Evidence
 from .enums import RehabBasis, RentBasis, ValueBasis
+from .investor import InvestorProfile
 from .money import D, Numeric
 
 
@@ -90,6 +91,9 @@ class DealInputs:
     property_facts: PropertyFacts = field(default_factory=PropertyFacts)
     assumptions: Assumptions = field(default_factory=Assumptions)
     evidence: Evidence = field(default_factory=Evidence)
+    # Describes the INVESTOR, not the deal. Optional: an unstated profile means
+    # capital-constraint questions are reported as unknown, never assumed.
+    investor_profile: InvestorProfile = field(default_factory=InvestorProfile)
 
     # Free-form flags a user or the research agent can raise. These feed the
     # risk engine; see scoring-engine for how they gate a PURSUE verdict.
@@ -138,6 +142,7 @@ class DealInputs:
             "property_facts": self.property_facts.to_dict(),
             "assumptions": self.assumptions.to_dict(),
             "evidence": self.evidence.to_dict(),
+            "investor_profile": self.investor_profile.to_dict(),
             "risk_flags": list(self.risk_flags),
         }
 
@@ -175,6 +180,7 @@ class DealInputs:
                 occupancy=facts_raw.get("occupancy"),
             ),
             assumptions=Assumptions.from_dict(data.get("assumptions")),
+            investor_profile=InvestorProfile.from_dict(data.get("investor_profile")),
             evidence=Evidence(
                 arv_basis=ValueBasis(evidence_raw.get("arv_basis", ValueBasis.UNKNOWN.value)),
                 comp_count=int(evidence_raw.get("comp_count") or 0),

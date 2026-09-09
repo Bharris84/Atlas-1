@@ -398,6 +398,8 @@ class AnalysisRequest(AtlasModel):
     evidence: Optional[EvidencePayload] = None
     # Partial assumption overrides; anything omitted keeps its default.
     assumptions: Optional[Dict[str, Any]] = None
+    # Overrides the investor's saved profile for this analysis only.
+    investor_profile: Optional[Dict[str, Any]] = None
     risk_flags: List[str] = Field(default_factory=list, max_length=50)
 
     # Ask the AI layer to narrate the result. Off by default: the numbers are
@@ -436,6 +438,9 @@ class AnalysisResponse(AtlasModel):
     overall_confidence: str
     missing_information: List[str]
     scoring: Dict[str, Any]
+    # Provisional, additive metric. Reported next to the ranking; it does not
+    # feed the ranking or the deal score.
+    capital_efficiency: Dict[str, Any] = Field(default_factory=dict)
     ai_analysis: Optional[Dict[str, Any]] = None
     engine_version: str
     created_at: Optional[datetime] = None
@@ -479,12 +484,15 @@ class UserSettingsRead(AtlasModel):
     email: Optional[str] = None
     display_name: Optional[str] = None
     default_assumptions: Dict[str, Any]
+    investor_profile: Dict[str, Any]
     provisional_defaults_note: str
+    provisional_profile_note: str
 
 
 class UserSettingsUpdate(AtlasModel):
     display_name: Optional[str] = Field(default=None, max_length=200)
     default_assumptions: Optional[Dict[str, Any]] = None
+    investor_profile: Optional[Dict[str, Any]] = None
 
 
 # --- Dashboard --------------------------------------------------------------

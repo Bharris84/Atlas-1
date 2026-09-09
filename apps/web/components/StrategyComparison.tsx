@@ -42,7 +42,7 @@ export function StrategyComparison({ analysis }: { analysis: AnalysisResponse })
       </div>
 
       <div className="overflow-x-auto">
-        <table className="table tabular min-w-[860px]">
+        <table className="table tabular min-w-[860px]" aria-label="Strategies compared">
           <thead>
             <tr>
               <th className="sticky left-0 z-10 bg-white">Metric</th>

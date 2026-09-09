@@ -17,6 +17,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from .assumptions import StrategyRankingWeights
+from .capital_efficiency import CapitalEfficiency, compute_all_capital_efficiency
 from .enums import Confidence, Strategy
 from .inputs import DealInputs
 from .money import D, MONTHS_PER_YEAR, Numeric, ZERO, ratio, safe_div
@@ -209,6 +210,9 @@ class StrategyComparison:
     viable_exit_count: int
     overall_confidence: Confidence
     missing_information: List[str] = field(default_factory=list)
+    # Provisional, additive metric. Reported alongside the ranking; it does NOT
+    # feed the ranking or the deal score. See capital_efficiency.py.
+    capital_efficiency: Dict[Strategy, CapitalEfficiency] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -220,6 +224,9 @@ class StrategyComparison:
             "viable_exit_count": self.viable_exit_count,
             "overall_confidence": self.overall_confidence.value,
             "missing_information": list(self.missing_information),
+            "capital_efficiency": {
+                k.value: v.to_dict() for k, v in self.capital_efficiency.items()
+            },
         }
 
 
@@ -334,6 +341,15 @@ def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
     missing = sorted({m for r in results.values() for m in r.missing_inputs})
     missing.extend(m for m in inputs.missing_fields() if m not in missing)
 
+    # Computed for every strategy, reported next to the ranking, and
+    # deliberately not fed back into it. Wiring it into the ranking is a
+    # decision to make against calibration evidence, not in advance of it.
+    capital_efficiency = compute_all_capital_efficiency(
+        results,
+        profile=inputs.investor_profile if inputs.investor_profile.is_stated else None,
+        target_return=inputs.assumptions.flip.minimum_roi,
+    )
+
     return StrategyComparison(
         results=results,
         scores=scores,
@@ -343,4 +359,5 @@ def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
         viable_exit_count=viable_exit_count,
         overall_confidence=overall_confidence,
         missing_information=sorted(set(missing)),
+        capital_efficiency=capital_efficiency,
     )

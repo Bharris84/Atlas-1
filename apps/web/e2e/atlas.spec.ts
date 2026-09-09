@@ -10,6 +10,12 @@ import { expect, test, type Page } from "@playwright/test";
 const UNIQUE = Date.now();
 const ADDRESS = `${UNIQUE} Magnolia Street`;
 
+/** The strategies table. Scoped by name because the capital efficiency table
+ * reuses several row labels ("Profit", "Capital deployed"). */
+function strategyTable(page: Page) {
+  return page.getByRole("table", { name: "Strategies compared" });
+}
+
 async function fillDealInputs(page: Page) {
   await page.getByLabel("Purchase price", { exact: true }).fill("150000");
   await page.getByLabel("After-repair value (ARV)").fill("250000");
@@ -22,7 +28,9 @@ test.describe("Deal analyzer", () => {
     await page.goto("/analyzer");
     await fillDealInputs(page);
 
-    await expect(page.getByRole("cell", { name: "Profit" })).toBeVisible({ timeout: 15_000 });
+    await expect(
+      strategyTable(page).getByRole("cell", { name: "Profit", exact: true })
+    ).toBeVisible({ timeout: 15_000 });
 
     // Every strategy appears as its own column.
     for (const strategy of [
@@ -33,7 +41,7 @@ test.describe("Deal analyzer", () => {
       "Seller Finance",
     ]) {
       await expect(
-        page.getByRole("columnheader", { name: new RegExp(strategy) })
+        strategyTable(page).getByRole("columnheader", { name: new RegExp(strategy) })
       ).toBeVisible();
     }
 
@@ -74,7 +82,7 @@ test.describe("Deal analyzer", () => {
     await page.goto("/analyzer");
     await fillDealInputs(page);
 
-    const flipProfit = page
+    const flipProfit = strategyTable(page)
       .getByRole("row", { name: /^Profit/ })
       .getByRole("cell")
       .nth(2);
@@ -124,9 +132,9 @@ test.describe("Property lifecycle", () => {
     // 2. Underwrite it.
     await page.getByRole("button", { name: "Financials" }).click();
     await fillDealInputs(page);
-    await expect(page.getByRole("cell", { name: "Profit" })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(
+      strategyTable(page).getByRole("cell", { name: "Profit", exact: true })
+    ).toBeVisible({ timeout: 15_000 });
 
     // 3. Save with a reason, which is what the audit trail records.
     await page.getByLabel("Reason for this change").fill("Initial underwriting");
@@ -200,5 +208,59 @@ test.describe("Navigation and honesty about what is not built", () => {
     });
     await expect(page.getByRole("heading", { name: "Connections" })).toBeVisible();
     await expect(page.getByText(/Atlas runs with none of these configured/)).toBeVisible();
+  });
+});
+
+test.describe("Calibration layer", () => {
+  test("capital efficiency is reported and shows its working", async ({ page }) => {
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+
+    await expect(page.getByRole("heading", { name: /Capital efficiency/ })).toBeVisible({
+      timeout: 15_000,
+    });
+    // It is labelled provisional, and stated as additive to the deal score.
+    await expect(page.getByText("provisional").first()).toBeVisible();
+    await expect(page.getByText(/does not change it/)).toBeVisible();
+
+    // The working must be inspectable, or the metric is not checkable.
+    await page.getByRole("button", { name: "How Fix & Flip was computed" }).click();
+    await expect(page.getByText(/annualised return on capital/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Inputs used" })).toBeVisible();
+  });
+
+  test("affordability is unknown until an investor profile is set", async ({ page }) => {
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+    await expect(page.getByRole("heading", { name: /Capital efficiency/ })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByText("not stated").first()).toBeVisible();
+  });
+
+  test("the investor profile saves and constrains affordability", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByRole("heading", { name: "Investor profile" })).toBeVisible({
+      timeout: 15_000,
+    });
+    // Stated as describing the investor, not the property.
+    await expect(page.getByText(/describes you, not a property/)).toBeVisible();
+
+    await page.getByLabel("Available capital").fill("20000");
+    await page.getByLabel("Max per deal").fill("15000");
+    await page.getByLabel("Risk tolerance").selectOption("conservative");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.getByText(/Saved\./)).toBeVisible({ timeout: 15_000 });
+
+    // It persists.
+    await page.reload();
+    await expect(page.getByLabel("Available capital")).toHaveValue("20000", {
+      timeout: 15_000,
+    });
+
+    // And it now answers the affordability question on a deal.
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+    await expect(page.getByText("Exceeds limit").first()).toBeVisible({ timeout: 15_000 });
   });
 });

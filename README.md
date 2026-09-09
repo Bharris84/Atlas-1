@@ -80,14 +80,16 @@ tests/                   Cross-cutting and end-to-end tests
 | 5 | Data provider abstraction + RentCast | **Done** |
 | 6 | AI research agent | **Done** |
 | 7 | AI strategist / underwriter | **Done** |
+| 7.5 | Calibration: investor profile, capital efficiency, prediction-vs-actual | **Done** |
 | 8 | CRM and lead management | Planned |
 | 9 | Automated market discovery | Planned |
 | 10 | Historical outcomes, predictive intelligence | Planned |
 | 11 | SaaS / data product | Planned |
 
-See [`docs/architecture.md`](docs/architecture.md) for the design and
+See [`docs/architecture.md`](docs/architecture.md) for the design,
 [`docs/financial-model.md`](docs/financial-model.md) for every formula and
-default assumption.
+default assumption, and [`docs/calibration.md`](docs/calibration.md) for how to
+check those assumptions against real deals.
 
 ---
 
@@ -156,9 +158,14 @@ Notable decisions, each explained in `docs/financial-model.md`:
   excluded and the coverage is reported, rather than padded with a guess.
 - **Hard risks beat good scores.** An unverified ARV or a suspected structural
   problem forces human review regardless of the number.
+- **Efficiency is not affordability.** Capital efficiency says how hard a
+  dollar works; the investor profile says whether the dollars exist. Atlas
+  reports them separately so you know which problem you have.
 
 All assumptions are provisional defaults, visible and editable per deal, with
-every change recorded in an audit trail.
+every change recorded in an audit trail. `python scripts/calibrate.py` compares
+predictions against real outcomes and attributes the gap to a specific
+assumption.
 
 ---
 

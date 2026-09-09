@@ -22,6 +22,7 @@ from atlas_ai_agents import get_ai_provider, run_all_agents
 from atlas_financial_engine import (
     Assumptions,
     DealInputs,
+    InvestorProfile,
     Strategy,
     __version__ as engine_version,
     analyze_all_strategies,
@@ -63,10 +64,28 @@ def resolve_assumptions(
     return Assumptions.from_dict(merged) if merged else Assumptions()
 
 
+def resolve_investor_profile(
+    saved_profile: Optional[Dict[str, Any]],
+    request_overrides: Optional[Dict[str, Any]],
+) -> InvestorProfile:
+    """The investor's saved profile, with any per-analysis override applied.
+
+    Kept separate from ``resolve_assumptions`` because the two describe
+    different things: one the investor, the other the deal.
+    """
+    merged: Dict[str, Any] = {}
+    if saved_profile:
+        merged = _deep_merge(merged, saved_profile)
+    if request_overrides:
+        merged = _deep_merge(merged, request_overrides)
+    return InvestorProfile.from_dict(merged) if merged else InvestorProfile()
+
+
 def build_deal_inputs(
     payload: Dict[str, Any],
     user_defaults: Optional[Dict[str, Any]] = None,
     property_row: Optional[Property] = None,
+    investor_profile: Optional[Dict[str, Any]] = None,
 ) -> DealInputs:
     """Build engine inputs from a request payload.
 
@@ -75,6 +94,7 @@ def build_deal_inputs(
     """
     data = dict(payload)
     assumptions = resolve_assumptions(user_defaults, data.pop("assumptions", None))
+    profile = resolve_investor_profile(investor_profile, data.pop("investor_profile", None))
 
     facts = dict(data.pop("property_facts", None) or {})
     if property_row is not None:
@@ -113,6 +133,7 @@ def build_deal_inputs(
     inputs_payload["evidence"] = data.get("evidence") or {}
     inputs_payload["risk_flags"] = data.get("risk_flags") or []
     inputs_payload["assumptions"] = assumptions.to_dict()
+    inputs_payload["investor_profile"] = profile.to_dict()
     return DealInputs.from_dict(inputs_payload)
 
 
@@ -179,6 +200,7 @@ def build_response_payload(
         "overall_confidence": comparison_dict["overall_confidence"],
         "missing_information": comparison_dict["missing_information"],
         "scoring": scoring.to_dict(),
+        "capital_efficiency": comparison_dict["capital_efficiency"],
         "ai_analysis": ai_output,
         "engine_version": engine_version,
     }
@@ -263,6 +285,7 @@ def apply_to_model(
         "viable_exit_count": payload["viable_exit_count"],
         "overall_confidence": payload["overall_confidence"],
         "missing_information": payload["missing_information"],
+        "capital_efficiency": payload["capital_efficiency"],
     }
     analysis.scoring_json = payload["scoring"]
     if ai_output is not None:
@@ -287,6 +310,7 @@ def stored_analysis_payload(analysis: DealAnalysis) -> Dict[str, Any]:
         "viable_exit_count": results.get("viable_exit_count", 0),
         "overall_confidence": results.get("overall_confidence", "LOW"),
         "missing_information": results.get("missing_information", []),
+        "capital_efficiency": results.get("capital_efficiency", {}),
         "scoring": analysis.scoring_json or {},
         "ai_analysis": analysis.ai_analysis_json,
         "engine_version": analysis.engine_version or engine_version,

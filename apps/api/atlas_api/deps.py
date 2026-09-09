@@ -68,3 +68,14 @@ def user_default_assumptions(
 ) -> Optional[Dict[str, Any]]:
     profile = db.get(UserProfile, user.id)
     return profile.default_assumptions if profile else None
+
+
+def user_investor_profile(
+    db: Session = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+) -> Optional[Dict[str, Any]]:
+    """The investor's saved capital constraints and return requirements.
+
+    Separate from the buy box: one describes the investor, the other the deal.
+    """
+    profile = db.get(UserProfile, user.id)
+    return profile.investor_profile if profile else None

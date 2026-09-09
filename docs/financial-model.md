@@ -266,6 +266,78 @@ Scoring rules that keep the ranking honest:
 
 ---
 
+## Capital efficiency (provisional, additive)
+
+A second opinion reported alongside the deal score. It does **not** change the
+deal score or the strategy ranking; wiring it into the ranking is a decision to
+make against calibration evidence, not in advance of it.
+
+The question it answers is not "how much does this make?" but "how hard does
+each dollar work, and how long is it stuck?"
+
+```
+transactional (wholesale, flip):
+  profit / capital deployed x (12 / holding months) = annualised return on capital
+
+annual income (buy & hold, BRRRR, seller finance):
+  annual cash flow / capital deployed              = annualised return on capital
+```
+
+The split matters. A flip's profit lands once at exit; a rental's is a yearly
+figure that repeats. Annualising the second one again would double it.
+
+Scored on the same convention as the strategy ranker: hitting the target return
+scores 50, twice the target scores 100. The target is the investor's minimum
+ROI if stated, otherwise the deal's flip ROI target, otherwise 20%.
+
+Also reported, all visible in the UI: capital velocity (turnover per year),
+profit per $1,000 deployed, capital recycled at refinance (BRRRR), and the share
+of the investor's available capital the deal would consume.
+
+Two rules keep it honest:
+
+- **A profitable strategy needing no capital scores 100.** Return on zero
+  capital is undefined, not infinite, and not zero. Scoring it zero would
+  punish a wholesale for the very property that makes it attractive.
+- **Efficiency and affordability stay separate.** `score` says how well capital
+  is used; `within_capital_limit` says whether the investor can fund it. A deal
+  can be an excellent use of capital and still be impossible today. Collapsing
+  them into one number would hide which problem you have.
+
+Every figure publishes the inputs it used and a plain-English `formula`, so the
+score can be recomputed by hand. A metric nobody can check is a metric nobody
+should trust.
+
+---
+
+## Investor profile
+
+Separate from the buy box, because the two describe different things. The buy
+box describes how a **deal** is underwritten; the profile describes the
+**investor** — and it is the same across every property they look at.
+
+| Field | Meaning |
+|---|---|
+| Available capital | Total liquid capital |
+| Max capital deployment | The most to commit to a single deal |
+| Preferred minimum cash flow | Monthly |
+| Minimum ROI | Overrides the deal target when scoring capital efficiency |
+| Max cash left in deal | Ceiling on trapped capital |
+| Minimum wholesale assignment | Smallest fee worth doing |
+| Risk tolerance | conservative / moderate / aggressive |
+| Capital efficiency preference | velocity / balanced / absolute profit |
+| Preferred strategies | Empty means no preference, not "none acceptable" |
+
+**Nothing here changes the underwriting.** The same property produces identical
+numbers for every investor; the profile only answers whether that investor can
+act on them. Risk tolerance, capital preference and preferred strategies are
+recorded but not yet consumed by any calculation — the architecture is in
+place, the behaviour is a later decision.
+
+As everywhere else in Atlas, an unstated figure is unknown, not zero.
+
+---
+
 ## Deal scoring
 
 | Category | Weight | Assessable in V0.1? |

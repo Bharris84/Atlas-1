@@ -81,8 +81,12 @@ class UserProfile(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=_uuid)
     email: Mapped[Optional[str]] = mapped_column(String(320), index=True)
     display_name: Mapped[Optional[str]] = mapped_column(String(200))
-    # The user's buy box. Overrides the engine's provisional defaults.
+    # The user's buy box: per-deal underwriting defaults.
     default_assumptions: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
+    # The investor themselves: capital available, return requirements, risk
+    # tolerance. Kept separate from the buy box because it describes the
+    # investor rather than any property.
+    investor_profile: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
 
 
 class Property(Base, TimestampMixin):

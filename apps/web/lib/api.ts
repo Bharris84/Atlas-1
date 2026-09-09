@@ -206,6 +206,7 @@ export const api = {
   updateSettings: (body: {
     display_name?: string;
     default_assumptions?: Record<string, unknown>;
+    investor_profile?: Record<string, unknown>;
   }) => request<UserSettings>("/api/settings", { method: "PUT", ...json(body) }),
   resetSettings: () => request<UserSettings>("/api/settings/reset", { method: "POST" }),
 };

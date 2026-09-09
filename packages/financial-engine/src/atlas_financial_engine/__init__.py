@@ -19,6 +19,21 @@ from .assumptions import (
     TransactionCosts,
     WholesaleAssumptions,
 )
+from .capital_efficiency import (
+    CapitalEfficiency,
+    ProfitHorizon,
+    compute_all_capital_efficiency,
+    compute_capital_efficiency,
+)
+from .calibration import (
+    ActualOutcome,
+    Attribution,
+    CalibrationReport,
+    CalibrationResult,
+    build_report,
+    calibrate_deal,
+    calibrate_from_dicts,
+)
 from .confidence import Evidence, assess_arv, assess_rehab, assess_rent
 from .costs import ProjectCosts, compute_project_costs
 from .enums import (
@@ -33,6 +48,13 @@ from .enums import (
     Verdict,
 )
 from .inputs import DealInputs, PropertyFacts, build_inputs
+from .investor import (
+    CapitalEfficiencyPreference,
+    EARLY_STAGE_PROFILE,
+    InvestorProfile,
+    PROVISIONAL_PROFILE_NOTE,
+    RiskTolerance,
+)
 from .loans import (
     amortization_schedule,
     dscr,
@@ -57,7 +79,23 @@ from .strategy_engine import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "ActualOutcome",
     "Assertion",
+    "Attribution",
+    "CalibrationReport",
+    "CalibrationResult",
+    "build_report",
+    "calibrate_deal",
+    "calibrate_from_dicts",
+    "CapitalEfficiency",
+    "CapitalEfficiencyPreference",
+    "EARLY_STAGE_PROFILE",
+    "InvestorProfile",
+    "PROVISIONAL_PROFILE_NOTE",
+    "ProfitHorizon",
+    "RiskTolerance",
+    "compute_all_capital_efficiency",
+    "compute_capital_efficiency",
     "Assumptions",
     "BrrrrAssumptions",
     "Confidence",
