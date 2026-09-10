@@ -3,17 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components hooks lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "next": "^14.2.35",
+    "@atlas/shared-types": "file:../../packages/shared-types",
+    "next": "^16.3.4",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

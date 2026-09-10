@@ -51,7 +51,10 @@ export default defineConfig({
       },
     },
     {
-      command: `npx next dev --port ${WEB_PORT}`,
+      // --webpack for the same reason as the build script: Next 16 defaults to
+      // Turbopack, which cannot resolve the source-only @atlas/shared-types
+      // package entry.
+      command: `npx next dev --webpack --port ${WEB_PORT}`,
       port: WEB_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
