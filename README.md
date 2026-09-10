@@ -86,10 +86,11 @@ tests/                   Cross-cutting and end-to-end tests
 | 10 | Historical outcomes, predictive intelligence | Planned |
 | 11 | SaaS / data product | Planned |
 
-See [`docs/architecture.md`](docs/architecture.md) for the design,
-[`docs/financial-model.md`](docs/financial-model.md) for every formula and
-default assumption, and [`docs/calibration.md`](docs/calibration.md) for how to
-check those assumptions against real deals.
+See [`docs/financial-model.md`](docs/financial-model.md) for every formula and
+default assumption, [`docs/calibration.md`](docs/calibration.md) for how to
+check those assumptions against real deals, and
+[`docs/database-validation.md`](docs/database-validation.md) for what the schema
+and the row-level security policies have actually been proven to do.
 
 ---
 
@@ -173,9 +174,15 @@ assumption.
 
 ```bash
 make test          # Python: engines and API
+make test-postgres # Schema and RLS, against a real PostgreSQL
 make test-web      # Vitest unit tests
 make test-e2e      # Playwright end-to-end
 ```
+
+`make test` runs on SQLite and needs nothing installed. `make test-postgres`
+needs a reachable server (`ATLAS_TEST_POSTGRES_URL`) and skips itself without
+one; it is what proves NUMERIC precision, cascade deletes, and the row-level
+security policies — none of which SQLite can tell you anything about.
 
 The financial engine is covered to ~98%, including the edge cases that matter
 in practice: zero and negative cash flow, missing inputs, rehab exceeding ARV,

@@ -1,5 +1,5 @@
-.PHONY: help install install-web test test-engine test-api test-web test-e2e \
-        api web seed migration lint clean
+.PHONY: help install install-web test test-engine test-api test-postgres \
+        test-web test-e2e api web seed migration lint clean
 
 PYTHON ?= python3
 VENV   ?= .venv
@@ -11,6 +11,7 @@ help:
 	@echo "  make install      Create a virtualenv and install the Python packages"
 	@echo "  make install-web  Install the web app's dependencies"
 	@echo "  make test         Run the Python test suites"
+	@echo "  make test-postgres Schema and RLS tests against a real PostgreSQL"
 	@echo "  make test-web     Run the Vitest unit tests"
 	@echo "  make test-e2e     Run the Playwright end-to-end tests"
 	@echo "  make api          Run the API on :8000"
@@ -42,6 +43,16 @@ test-engine:
 
 test-api:
 	cd apps/api && ../../$(BIN)/pytest -q
+
+# Schema and row-level-security tests. Skipped by `make test` because they
+# need a live PostgreSQL; point ATLAS_TEST_POSTGRES_URL at one to run them.
+# The URL must name a role allowed to CREATE DATABASE and CREATE ROLE: each
+# test module builds its own throwaway database and drops it afterwards.
+ATLAS_TEST_POSTGRES_URL ?= postgresql://atlas:atlas@127.0.0.1:5432/postgres
+
+test-postgres:
+	cd apps/api && ATLAS_TEST_POSTGRES_URL="$(ATLAS_TEST_POSTGRES_URL)" \
+		../../$(BIN)/pytest -q tests/test_postgres_schema.py tests/test_rls.py
 
 test-web:
 	cd apps/web && npm run test

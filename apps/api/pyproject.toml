@@ -24,7 +24,9 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.1"]
-dev = ["pytest>=7.4", "pytest-cov>=4.1", "httpx>=0.26"]
+# psycopg is here as well as in [postgres] so that `make test-postgres`
+# works from a plain dev install; the tests skip themselves without it.
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "httpx>=0.26", "psycopg[binary]>=3.1"]
 
 [tool.setuptools.packages.find]
 include = ["atlas_api*"]
