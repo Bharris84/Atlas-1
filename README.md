@@ -81,6 +81,7 @@ tests/                   Cross-cutting and end-to-end tests
 | 6 | AI research agent | **Done** |
 | 7 | AI strategist / underwriter | **Done** |
 | 7.5 | Calibration: investor profile, capital efficiency, prediction-vs-actual | **Done** |
+| 7.6 | Reality Check: internal consistency, PostgreSQL/RLS validation, unknown expenses | **Done** |
 | 8 | CRM and lead management | Planned |
 | 9 | Automated market discovery | Planned |
 | 10 | Historical outcomes, predictive intelligence | Planned |
@@ -88,9 +89,11 @@ tests/                   Cross-cutting and end-to-end tests
 
 See [`docs/financial-model.md`](docs/financial-model.md) for every formula and
 default assumption, [`docs/calibration.md`](docs/calibration.md) for how to
-check those assumptions against real deals, and
+check those assumptions against real deals,
 [`docs/database-validation.md`](docs/database-validation.md) for what the schema
-and the row-level security policies have actually been proven to do.
+and the row-level security policies have actually been proven to do, and
+[`docs/technical-debt.md`](docs/technical-debt.md) for everything known to be
+incomplete or deferred.
 
 ---
 
