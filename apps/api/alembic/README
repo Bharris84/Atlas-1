@@ -1,0 +1,11 @@
+Alembic migration environment for Atlas.
+
+  versions/         the revisions themselves, one file each
+  env.py            resolves ATLAS_DATABASE_URL and configures the run
+  script.py.mako    the template a new revision is generated from
+
+Do not run `alembic` here without a config path — use the Makefile targets
+(`make db-upgrade`, `make db-current`, `make db-check`) or
+`alembic -c apps/api/alembic.ini <command>`.
+
+The workflow, and why this replaced hand-applied SQL, is in docs/migrations.md.

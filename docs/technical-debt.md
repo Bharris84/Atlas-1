@@ -7,34 +7,23 @@ and so a decision to defer stays a decision rather than becoming an oversight.
 Nothing here is a bug in the sense of "produces a wrong number". Items that
 would produce a wrong number get fixed, not listed.
 
-Last reviewed: 2026-09-10, at the end of the Reality Check phase.
+Last reviewed: 2026-09-10, after adopting Alembic.
 
 ---
 
 ## Database
 
-### 1. No versioned migration runner — **highest priority**
+### 1. ~~No versioned migration runner~~ — **CLEARED**
 
-`database/migrations/` is a directory of `.sql` files applied by hand. Nothing
-records which migrations a database has received, nothing prevents applying
-them out of order, and nothing rolls one back.
+Alembic is now the authoritative runner. The history is linear and each
+revision does what it claims; `init_db()` upgrades instead of calling
+`create_all()`; pre-Alembic databases are stamped by
+`scripts/db_baseline.py`. Both original symptoms — the no-op `0003` and the
+e2e suite's `no such column` — are pinned by tests in
+`apps/api/tests/test_migrations.py`.
 
-The symptoms are already visible:
-
-- `0003_investor_profile.sql` is a silent no-op — the regenerated `0001`
-  already contains the column it adds. With a runner, "this migration changed
-  nothing" would have been an observable fact rather than a discovery.
-- The e2e suite had to start deleting its SQLite file, because `create_all()`
-  adds tables but never alters an existing one, so a schema change plus a
-  leftover database failed deep inside a query with `no such column`.
-
-**Why deferred:** product-owner decision during the Reality Check. Adopting
-Alembic mid-phase would have expanded the work beyond what was approved.
-
-**To clear:** adopt Alembic, stamp existing databases at 0004, and generate
-subsequent revisions from the models. Do it **before the schema changes again
-under real data** — retrofitting a runner over an unknown deployed state is
-much worse than adopting one now.
+See [`migrations.md`](migrations.md). What remains is the residual risk listed
+under **Migrations** below, not the debt itself.
 
 ### 2. JSON columns are `json`, not `jsonb`
 
@@ -46,14 +35,15 @@ whitespace and key order. Atlas does not need `json`'s exact-text preservation.
 Pinned by `test_json_columns_are_json_not_jsonb`, which documents reality
 rather than asserting it is right.
 
-**To clear:** a type-changing migration over existing rows — so it waits on
-item 1.
+**To clear:** a type-changing migration over existing rows. Item 1 was the
+blocker and is gone, so this is now straightforward to write — the only real
+work is deciding whether to rewrite the stored values in the same revision.
 
 ### 3. RLS is Supabase-specific and unverifiable outside it
 
-`0002_row_level_security.sql` calls `auth.uid()`, which Supabase provides and
-PostgreSQL does not. Applied to a vanilla server it fails outright. Atlas
-pointed at plain PostgreSQL has **no row-level security at all** — only the
+Revision `0002_row_level_security` calls `auth.uid()`, which Supabase provides
+and PostgreSQL does not, so it skips itself on a vanilla server. Atlas pointed
+at plain PostgreSQL has **no row-level security at all** — only the
 application's own `owner_id` filter.
 
 The policies themselves are tested (18 tests, via a test-only `auth.uid()`
@@ -159,7 +149,7 @@ requires `vitest@4` and the ESLint 9 migration above.
 
 `make test` runs on SQLite, which differs from PostgreSQL on JSON handling,
 NUMERIC precision, foreign-key enforcement and timezone semantics.
-`make test-postgres` covers those 27 cases, but it is opt-in and skips
+`make test-postgres` covers those cases, but it is opt-in and skips
 silently without `ATLAS_TEST_POSTGRES_URL`.
 
 **To clear:** run `make test-postgres` in CI against a service container, so
@@ -169,6 +159,38 @@ the gap cannot reopen unnoticed.
 
 The indexes exist; no plan has been examined against a realistic row count, and
 nothing has been tested under concurrent writes.
+
+---
+
+## Migrations
+
+Residual risk left by adopting Alembic, none of it blocking.
+
+### 14. `0002` skips silently on databases without `auth.uid()`
+
+The RLS revision logs a warning and moves on rather than failing, so an
+`upgrade head` on plain PostgreSQL reports complete success and leaves the
+database with no row-level security. The alternative — aborting — would make
+the runner unusable on every development machine, which is worse. The gap is
+real and is documented in `database-validation.md`; the mitigation is that
+`scripts/db_baseline.py` reports RLS status explicitly.
+
+### 15. Stamping a legacy database infers the revision from its columns
+
+`scripts/db_baseline.py` reads the schema and picks a revision. That is right
+for every database Atlas has actually produced, but a hand-modified one could
+in principle carry a column combination the rules do not anticipate — for
+instance `assumptions_schema_version` added by hand without `investor_profile`.
+The dry run is the default so the plan can be read before it is applied.
+
+### 16. `init_db()` migrates at application startup
+
+Convenient for one process, wrong for several starting at once: each would try
+to migrate and one would win. It logs a warning whenever it actually applies
+something, and `docs/migrations.md` tells deployments to run `make db-upgrade`
+as an explicit step. A proper fix is to make startup *verify* the revision and
+refuse to serve when behind, rather than migrating — which is a behaviour
+change worth making deliberately.
 
 ---
 

@@ -23,14 +23,25 @@ os.environ.pop("RENTCAST_API_KEY", None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from atlas_api.db import SessionLocal, engine  # noqa: E402
+from atlas_api.db import SessionLocal, engine, upgrade_to_head  # noqa: E402
 from atlas_api.main import app  # noqa: E402
 from atlas_api.models import Base  # noqa: E402
 
 
+@pytest.fixture(scope="session", autouse=True)
+def migrated_schema() -> Iterator[None]:
+    """Build the test database from the migration history, once.
+
+    Deliberately not ``Base.metadata.create_all()``. Tests that run against a
+    schema the migrations never produced cannot catch a migration that is
+    wrong, and that gap is what let a missing column reach the e2e suite.
+    """
+    upgrade_to_head()
+    yield
+
+
 @pytest.fixture(autouse=True)
-def clean_database() -> Iterator[None]:
-    Base.metadata.create_all(bind=engine)
+def clean_database(migrated_schema: None) -> Iterator[None]:
     yield
     with SessionLocal() as session:
         for table in reversed(Base.metadata.sorted_tables):

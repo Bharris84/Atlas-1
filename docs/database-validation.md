@@ -1,7 +1,7 @@
 # Database and RLS validation
 
 Until this point Atlas's PostgreSQL schema and its row-level security policies
-had never been executed. The test suite ran on SQLite, and `0002_row_level_security.sql`
+had never been executed. The test suite ran on SQLite, and the row-level security SQL
 had never been applied to any database at all. "The schema works" and "RLS is
 implemented" were both claims about files, not about behaviour.
 
@@ -35,14 +35,16 @@ Validated against **PostgreSQL 16.13** on 2026-09-10.
 
 Two of these deserve a note.
 
-**The migration and the ORM agree — but nothing was enforcing it.** The SQL is
-generated from the models by `scripts/generate_migration.py`, so drift was
-always possible and would have been silent. The comparison is now a test.
+**The migrations and the ORM agree — but nothing was enforcing it.** The SQL
+used to be regenerated from the models by a script, so drift was always
+possible and would have been silent. It is now a test, and `make db-check`
+answers the same question from Alembic's side.
 
-**`0003` is a no-op.** It adds `investor_profile` to `user_profiles`, but the
-regenerated `0001` already contains that column, so `ADD COLUMN IF NOT EXISTS`
-finds nothing to do. This is harmless on a fresh database and correct on an
-existing one; it is only confusing to read. Left as-is.
+**`0003` was a no-op.** It added `investor_profile` to `user_profiles`, but the
+regenerated `0001` already contained that column, so `ADD COLUMN IF NOT EXISTS`
+found nothing to do. Fixed by adopting Alembic: revision `0001_initial_schema`
+reconstructs the original schema without that column, so `0003` is now a real
+step. See [`migrations.md`](migrations.md).
 
 ---
 
@@ -50,7 +52,7 @@ existing one; it is only confusing to read. Left as-is.
 
 ### The honest framing
 
-`0002_row_level_security.sql` calls `auth.uid()`. That function is **provided
+The row-level security SQL calls `auth.uid()`. That function is **provided
 by Supabase, not by PostgreSQL**. Applied to a vanilla PostgreSQL 16 database,
 the migration fails outright:
 
@@ -138,17 +140,16 @@ being true in either direction.
 
 ## 3. Technical debt found
 
-### No versioned migration runner
+### ~~No versioned migration runner~~ — cleared
 
-`database/migrations/` is a directory of `.sql` files applied by hand. Nothing
-records which migrations a given database has received, nothing prevents
-applying them out of order, and nothing can roll one back. `0003` being a
-silent no-op is a symptom: with a runner, the fact that it changed nothing
-would have been visible.
+This was the finding here, and it has since been fixed: Alembic is now the
+authoritative runner, `0003` is a real migration rather than a no-op, and
+`init_db()` upgrades instead of calling `create_all()`. See
+[`migrations.md`](migrations.md).
 
-Adopting Alembic was considered during this Reality Check and **deliberately
-deferred by the product owner**. It is recorded here as known debt, to be taken
-on before the schema starts changing under real data.
+The results recorded above were produced by hand-applied SQL. The equivalent
+checks now run against a database built by `alembic upgrade head`, in
+`apps/api/tests/test_postgres_schema.py` and `test_migrations.py`.
 
 ### JSON columns are `json`, not `jsonb`
 
@@ -161,7 +162,8 @@ mismatch never surfaced.
 `jsonb` would be the better choice: it is indexable, faster to query, and
 normalises whitespace and key order. `json` preserves the exact text, which
 Atlas does not need. Changing it is a schema migration over existing rows, not
-a config tweak, so it waits for a migration runner. Pinned by
+a config tweak. That runner now exists, so this is writable whenever it is
+wanted. Pinned by
 `test_json_columns_are_json_not_jsonb`, which documents current reality rather
 than asserting it is right.
 
@@ -178,5 +180,4 @@ layer, and closing it requires running against a real Supabase project.
 - Behaviour under concurrent writes; there is no load or contention testing.
 - Index effectiveness — the indexes exist, but no query plan has been examined
   against a realistic row count.
-- Migration *sequencing* on a database that already holds data, which is the
-  thing a migration runner would give.
+- Supabase's own auth layer end to end, against a live project (unchanged).

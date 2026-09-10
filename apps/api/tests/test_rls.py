@@ -1,11 +1,11 @@
 """Row-level security validation against a real PostgreSQL server.
 
-`database/migrations/0002_row_level_security.sql` is the only part of Atlas
-that had never been executed. It calls `auth.uid()`, which Supabase provides
-and vanilla PostgreSQL does not, so it cannot be applied here as-is. These
-tests install `tests/sql/supabase_auth_shim.sql` first — a test fixture that
-recreates `auth.uid()` from `request.jwt.claims`, the mechanism Supabase
-documents — and then exercise the policies.
+Revision `0002_row_level_security` calls `auth.uid()`, which Supabase provides
+and vanilla PostgreSQL does not. The revision therefore skips itself where that
+function is absent, which is every developer machine. These tests install
+`tests/sql/supabase_auth_shim.sql` first — a test fixture recreating
+`auth.uid()` from `request.jwt.claims`, the mechanism Supabase documents — so
+the revision runs for real, and then exercise the policies it created.
 
 Read that file before trusting these results. In short:
 
@@ -23,18 +23,19 @@ Skipped automatically unless ATLAS_TEST_POSTGRES_URL points at a server:
 
 from __future__ import annotations
 
-import os
 import uuid
-from pathlib import Path
 
 import pytest
 
 psycopg = pytest.importorskip("psycopg")
 
-POSTGRES_URL = os.getenv("ATLAS_TEST_POSTGRES_URL")
-ROOT = Path(__file__).resolve().parents[3]
-MIGRATIONS = ROOT / "database" / "migrations"
-SHIM = Path(__file__).resolve().parent / "sql" / "supabase_auth_shim.sql"
+from pg_support import (  # noqa: E402
+    POSTGRES_URL,
+    alembic_config,
+    install_auth_shim,
+    server_reachable,
+    throwaway_database,
+)
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL, reason="ATLAS_TEST_POSTGRES_URL is not set"
@@ -46,14 +47,6 @@ USER_B = uuid.UUID("22222222-2222-2222-2222-222222222222")
 # Every table 0002 protects, and the role that end users connect as under
 # Supabase. Neither owns the tables, which is what makes the policies bite.
 END_USER_ROLE = "atlas_rls_enduser"
-
-
-def _server_reachable() -> bool:
-    try:
-        with psycopg.connect(POSTGRES_URL, connect_timeout=3):
-            return True
-    except Exception:
-        return False
 
 
 def _as_user(conn, user_id: uuid.UUID) -> None:
@@ -77,25 +70,22 @@ def _as_owner(conn) -> None:
 
 @pytest.fixture(scope="module")
 def rls_db():
-    """A database with the full schema, the auth shim, and RLS enabled."""
-    if not _server_reachable():
+    """A database with the full schema, the auth shim, and RLS enabled.
+
+    The shim goes in BEFORE the migrations run. Revision 0002 checks for
+    auth.uid() and skips when it is absent, so installing the shim afterwards
+    would produce a database with no policies and no error — which is exactly
+    the silent gap these tests exist to rule out.
+    """
+    if not server_reachable():
         pytest.skip("PostgreSQL is not reachable")
+    from alembic import command
 
-    name = f"atlas_rls_{uuid.uuid4().hex[:8]}"
-    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-        admin.execute(f'CREATE DATABASE "{name}"')
-    url = POSTGRES_URL.rsplit("/", 1)[0] + f"/{name}"
+    with throwaway_database("atlas_rls") as url:
+        install_auth_shim(url)
+        command.upgrade(alembic_config(url), "head")
 
-    try:
         with psycopg.connect(url, autocommit=True) as conn:
-            conn.execute((MIGRATIONS / "0001_initial_schema.sql").read_text())
-            conn.execute(SHIM.read_text())
-            conn.execute((MIGRATIONS / "0002_row_level_security.sql").read_text())
-            conn.execute((MIGRATIONS / "0003_investor_profile.sql").read_text())
-            conn.execute(
-                (MIGRATIONS / "0004_assumptions_schema_version.sql").read_text()
-            )
-
             conn.execute(
                 f"""
                 DO $$ BEGIN
@@ -115,10 +105,12 @@ def rls_db():
             # So the test connection can SET ROLE into it.
             conn.execute(f"GRANT {END_USER_ROLE} TO CURRENT_USER")
         yield url
-    finally:
-        with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-            admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
-            admin.execute(f"DROP ROLE IF EXISTS {END_USER_ROLE}")
+
+    # Outside the with-block on purpose: the database is dropped when it exits,
+    # and the role cannot be dropped while grants inside that database still
+    # depend on it.
+    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
+        admin.execute(f"DROP ROLE IF EXISTS {END_USER_ROLE}")
 
 
 @pytest.fixture
@@ -140,28 +132,30 @@ def _seed_property(conn, owner_id: uuid.UUID, address: str) -> uuid.UUID:
 
 
 class TestThePoliciesInstall:
-    def test_the_migration_needs_supabase_and_says_so(self, rls_db):
-        """0002 cannot be applied to a database that has no auth.uid().
+    def test_without_supabase_the_upgrade_succeeds_and_applies_no_policies(self):
+        """The honest version of "RLS is implemented": it is implemented for
+        Supabase specifically.
 
-        This is the honest version of "RLS is implemented": it is implemented
-        for Supabase specifically. Anyone pointing Atlas at plain PostgreSQL
-        gets no row-level security unless they supply auth.uid() themselves.
+        Revision 0002 must not abort an upgrade on a database that has no
+        auth.uid() — every developer machine is one — but it must not pretend
+        to have protected it either. So: upgrade reaches head, and zero
+        policies exist.
         """
-        name = f"atlas_noshim_{uuid.uuid4().hex[:8]}"
-        with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-            admin.execute(f'CREATE DATABASE "{name}"')
-        url = POSTGRES_URL.rsplit("/", 1)[0] + f"/{name}"
-        try:
-            with psycopg.connect(url, autocommit=True) as bare:
-                bare.execute((MIGRATIONS / "0001_initial_schema.sql").read_text())
-                with pytest.raises(psycopg.errors.InvalidSchemaName) as excinfo:
-                    bare.execute(
-                        (MIGRATIONS / "0002_row_level_security.sql").read_text()
-                    )
-            assert 'schema "auth" does not exist' in str(excinfo.value)
-        finally:
-            with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-                admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        if not server_reachable():
+            pytest.skip("PostgreSQL is not reachable")
+        from alembic import command
+
+        with throwaway_database("atlas_noshim") as url:
+            command.upgrade(alembic_config(url), "head")
+            with psycopg.connect(url) as conn:
+                version = conn.execute(
+                    "SELECT version_num FROM alembic_version"
+                ).fetchone()[0]
+                policies = conn.execute(
+                    "SELECT count(*) FROM pg_policies WHERE schemaname='public'"
+                ).fetchone()[0]
+        assert version == "0004_assumptions_schema_version"
+        assert policies == 0, "policies applied without auth.uid() — how?"
 
     def test_every_protected_table_has_rls_enabled(self, conn):
         enabled = {

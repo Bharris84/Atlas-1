@@ -39,11 +39,13 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // The database file is deleted first, not merely reused. Atlas has no
-      // migration runner yet, so create_all() adds tables but never alters an
-      // existing one: a schema change plus a leftover file from the previous
-      // run fails deep inside a query with "no such column", which reads like
-      // a code bug rather than a stale fixture.
+      // The database file is deleted first so each run starts from a known
+      // state. It used to be load-bearing for a different reason: before
+      // Alembic, create_all() never altered an existing table, so a schema
+      // change plus a leftover file failed deep inside a query with "no such
+      // column". The API now migrates on startup, so this is hygiene rather
+      // than a workaround — but shared state between runs is still worth
+      // avoiding.
       command: `rm -f ./atlas-e2e.db && ${PYTHON} -m uvicorn atlas_api.main:app --port ${API_PORT} --app-dir ../api`,
       port: API_PORT,
       reuseExistingServer: !process.env.CI,

@@ -52,7 +52,7 @@ estimate as a verified fact.
 ```
 apps/
   web/                   Next.js + TypeScript + Tailwind front end
-  api/                   FastAPI service, SQLAlchemy models, migrations
+  api/                   FastAPI service, SQLAlchemy models, Alembic migrations
 packages/
   financial-engine/      Deterministic underwriting maths (Python)
   scoring-engine/        Deal scoring, risk flags, verdicts (Python)
@@ -60,7 +60,7 @@ packages/
   ai-agents/             AI provider abstraction + agents (Python)
   shared-types/          TypeScript types shared with the web app
 database/
-  migrations/            SQL migrations
+  migrations/legacy/     Pre-Alembic SQL, kept as a record and never applied
   seeds/                 Seed data
 docs/                    Architecture and financial model documentation
 infrastructure/          Deployment configuration
@@ -82,6 +82,7 @@ tests/                   Cross-cutting and end-to-end tests
 | 7 | AI strategist / underwriter | **Done** |
 | 7.5 | Calibration: investor profile, capital efficiency, prediction-vs-actual | **Done** |
 | 7.6 | Reality Check: internal consistency, PostgreSQL/RLS validation, unknown expenses | **Done** |
+| 7.7 | Alembic as the authoritative migration runner | **Done** |
 | 8 | CRM and lead management | Planned |
 | 9 | Automated market discovery | Planned |
 | 10 | Historical outcomes, predictive intelligence | Planned |
@@ -91,7 +92,8 @@ See [`docs/financial-model.md`](docs/financial-model.md) for every formula and
 default assumption, [`docs/calibration.md`](docs/calibration.md) for how to
 check those assumptions against real deals,
 [`docs/database-validation.md`](docs/database-validation.md) for what the schema
-and the row-level security policies have actually been proven to do, and
+and the row-level security policies have actually been proven to do,
+[`docs/migrations.md`](docs/migrations.md) for the migration workflow, and
 [`docs/technical-debt.md`](docs/technical-debt.md) for everything known to be
 incomplete or deferred.
 
@@ -107,12 +109,21 @@ without PostgreSQL — it falls back to SQLite — and without any API keys.
 make install
 make test
 
+# Create or update the database schema
+make db-upgrade
+
 # Run the API (http://localhost:8000, docs at /docs)
 make api
 
 # Run the web app (http://localhost:3000)
 make web
 ```
+
+Schema changes go through Alembic — `make db-upgrade` applies them, `make
+db-check` fails if the models have drifted from the migrations. The API also
+upgrades on startup, so a local database needs no separate step. A database
+built before Alembic existed is brought under it with `make db-baseline`. See
+[`docs/migrations.md`](docs/migrations.md).
 
 ### Configuration
 
@@ -181,7 +192,7 @@ assumption.
 
 ```bash
 make test          # Python: engines and API
-make test-postgres # Schema and RLS, against a real PostgreSQL
+make test-postgres # Schema, RLS and migrations, against a real PostgreSQL
 make test-web      # Vitest unit tests
 make test-e2e      # Playwright end-to-end
 ```

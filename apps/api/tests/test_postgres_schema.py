@@ -4,6 +4,9 @@ The rest of the suite runs on SQLite, which is fine for behaviour but proves
 nothing about the production engine: JSON handling, NUMERIC precision, cascade
 deletes and timezone semantics all differ. These tests close that gap.
 
+The database under test is built by running the Alembic history from nothing,
+so a broken revision fails here rather than in production.
+
 Skipped automatically when no PostgreSQL is reachable, so the default suite
 still runs anywhere. Point ATLAS_TEST_POSTGRES_URL at a server to enable them:
 
@@ -13,75 +16,60 @@ still runs anywhere. Point ATLAS_TEST_POSTGRES_URL at a server to enable them:
 
 from __future__ import annotations
 
-import os
 import uuid
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 psycopg = pytest.importorskip("psycopg")
 
-POSTGRES_URL = os.getenv("ATLAS_TEST_POSTGRES_URL")
-MIGRATIONS = Path(__file__).resolve().parents[3] / "database" / "migrations"
+from pg_support import (  # noqa: E402
+    POSTGRES_URL,
+    alembic_config,
+    as_sqlalchemy_url,
+    server_reachable,
+    throwaway_database,
+)
 
 pytestmark = pytest.mark.skipif(
     not POSTGRES_URL, reason="ATLAS_TEST_POSTGRES_URL is not set"
 )
 
-
-def _server_reachable() -> bool:
-    try:
-        with psycopg.connect(POSTGRES_URL, connect_timeout=3):
-            return True
-    except Exception:
-        return False
+# Alembic's own bookkeeping table. It is part of the database, not part of
+# Atlas's schema, so every comparison against the models excludes it.
+ALEMBIC_TABLE = "alembic_version"
 
 
 @pytest.fixture(scope="module")
 def migrated_db():
-    """A database built from the SQL migrations."""
-    if not _server_reachable():
+    """A database built by running the Alembic history from nothing."""
+    if not server_reachable():
         pytest.skip("PostgreSQL is not reachable")
-    name = f"atlas_mig_{uuid.uuid4().hex[:8]}"
-    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-        admin.execute(f'CREATE DATABASE "{name}"')
-    url = POSTGRES_URL.rsplit("/", 1)[0] + f"/{name}"
-    try:
-        with psycopg.connect(url, autocommit=True) as conn:
-            for migration in (
-                "0001_initial_schema.sql",
-                "0003_investor_profile.sql",
-                "0004_assumptions_schema_version.sql",
-            ):
-                conn.execute((MIGRATIONS / migration).read_text())
+    from alembic import command
+
+    with throwaway_database("atlas_mig") as url:
+        command.upgrade(alembic_config(url), "head")
         yield url
-    finally:
-        with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-            admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
 @pytest.fixture(scope="module")
 def orm_db():
-    """A database built by SQLAlchemy's create_all()."""
-    if not _server_reachable():
+    """A database built by SQLAlchemy's create_all().
+
+    Kept as the comparison target for the drift test below. It is NOT how any
+    Atlas database is built any more — see test_migrations.py for why.
+    """
+    if not server_reachable():
         pytest.skip("PostgreSQL is not reachable")
-    name = f"atlas_orm_{uuid.uuid4().hex[:8]}"
-    with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-        admin.execute(f'CREATE DATABASE "{name}"')
-    url = POSTGRES_URL.rsplit("/", 1)[0] + f"/{name}"
-    try:
+    with throwaway_database("atlas_orm") as url:
         from sqlalchemy import create_engine
 
         from atlas_api.models import Base
 
-        engine = create_engine(url.replace("postgresql://", "postgresql+psycopg://"))
+        engine = create_engine(as_sqlalchemy_url(url))
         Base.metadata.create_all(bind=engine)
         engine.dispose()
         yield url
-    finally:
-        with psycopg.connect(POSTGRES_URL, autocommit=True) as admin:
-            admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
 def _columns(url: str):
@@ -90,9 +78,10 @@ def _columns(url: str):
             """
             SELECT table_name, column_name, data_type, is_nullable
             FROM information_schema.columns
-            WHERE table_schema = 'public'
+            WHERE table_schema = 'public' AND table_name <> %s
             ORDER BY table_name, column_name
-            """
+            """,
+            (ALEMBIC_TABLE,),
         ).fetchall()
 
 
@@ -104,26 +93,22 @@ class TestMigrationApplies:
                 for row in conn.execute(
                     "SELECT tablename FROM pg_tables WHERE schemaname='public'"
                 ).fetchall()
-            }
+            } - {ALEMBIC_TABLE}
         assert tables == {
             "user_profiles", "properties", "owners", "leads", "deal_analyses",
             "assumption_audit", "comps", "offers", "communications",
             "rehab_projects", "data_sources", "activity_log",
         }
 
-    def test_the_investor_profile_migration_is_idempotent(self, migrated_db):
-        """It must be safe to re-run against a database that already has it."""
-        sql = (MIGRATIONS / "0003_investor_profile.sql").read_text()
-        with psycopg.connect(migrated_db, autocommit=True) as conn:
-            conn.execute(sql)
-            conn.execute(sql)
+    def test_the_database_is_stamped_at_head(self, migrated_db):
+        """The point of a runner: the database records where it is.
 
-
-    def test_the_schema_version_migration_is_idempotent(self, migrated_db):
-        sql = (MIGRATIONS / "0004_assumptions_schema_version.sql").read_text()
-        with psycopg.connect(migrated_db, autocommit=True) as conn:
-            conn.execute(sql)
-            conn.execute(sql)
+        Without this row, Alembic treats the database as empty and the next
+        upgrade tries to create tables that already exist.
+        """
+        with psycopg.connect(migrated_db) as conn:
+            version = conn.execute("SELECT version_num FROM alembic_version").fetchone()
+        assert version == ("0004_assumptions_schema_version",)
 
     def test_an_existing_analysis_defaults_to_the_legacy_schema_version(
         self, migrated_db
@@ -155,10 +140,14 @@ class TestMigrationApplies:
 
 
 class TestMigrationMatchesTheOrm:
-    def test_no_drift_between_the_sql_and_the_models(self, migrated_db, orm_db):
-        """The models are the source of truth; the SQL is generated from them.
+    def test_no_drift_between_the_migrations_and_the_models(
+        self, migrated_db, orm_db
+    ):
+        """Running the history must land exactly where the models say.
 
-        Nothing enforced that they stayed in step until this test existed.
+        `alembic check` asserts the same thing from Alembic's own comparison;
+        this asserts it from the database's, which is the one that matters when
+        a revision does something autogenerate would not have produced.
         """
         assert _columns(migrated_db) == _columns(orm_db)
 
@@ -216,9 +205,10 @@ class TestPostgresSpecificBehaviour:
 
         SQLAlchemy's generic JSON type maps to `json` on PostgreSQL. JSONB
         would be the better choice — it is indexable and faster to query — and
-        migration 0003 was written expecting JSONB, but the column already
+        the legacy 0003 SQL was written expecting JSONB, but the column already
         existed as `json` so the ADD COLUMN was a no-op. Recorded as known
-        technical debt; changing it is a schema migration, not a config tweak.
+        technical debt; changing it is a schema migration, not a config tweak —
+        and now that a runner exists, one that can actually be written.
         """
         with psycopg.connect(migrated_db) as conn:
             types = dict(

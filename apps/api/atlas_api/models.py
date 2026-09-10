@@ -273,7 +273,12 @@ class DealAnalysis(Base, TimestampMixin):
     # that back as unknown. Stored as a column as well as inside the blob so
     # legacy analyses can be found with a query rather than a JSON scan.
     assumptions_schema_version: Mapped[int] = mapped_column(
-        Integer, default=ASSUMPTIONS_SCHEMA_VERSION, server_default="0"
+        Integer,
+        default=ASSUMPTIONS_SCHEMA_VERSION,
+        server_default="0",
+        comment=(
+            "Generation of assumption semantics for assumptions_json. 0 = pre-tri-state, where a stored 0 for taxes/insurance/HOA meant unknown."
+        ),
     )
 
     property: Mapped["Property"] = relationship(back_populates="analyses")
