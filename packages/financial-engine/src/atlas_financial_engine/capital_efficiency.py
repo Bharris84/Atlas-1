@@ -1,4 +1,4 @@
-"""Capital efficiency — a provisional, transparent metric.
+"""Capital efficiency — the authoritative, transparent metric.
 
 The question this answers is not "how much does this deal make?" but "how hard
 does each dollar of my capital work, and for how long is it stuck?"
@@ -15,9 +15,11 @@ Design constraints this module holds itself to:
 * **Transparent.** Every input used is emitted alongside the result in
   ``inputs``, and ``formula`` states in plain language how the score was
   derived. A user must be able to recompute this by hand.
-* **Additive.** This does NOT replace or alter the deal score, and it is
-  deliberately NOT wired into strategy ranking yet. It is a second opinion,
-  reported next to the existing numbers, pending calibration against real deals.
+* **Single-sourced.** This is the ONE definition of capital efficiency in
+  Atlas. ``strategy_engine`` reads this exact score for its ranking component,
+  and the UI displays the same figure. A second, non-time-adjusted definition
+  used to live in the ranking; it disagreed with what the user was shown and
+  has been removed. The deal score in ``scoring-engine`` remains separate.
 
 Efficiency and affordability are kept apart on purpose. A deal can be a superb
 use of capital and still be one the investor cannot fund. ``score`` answers the
@@ -80,6 +82,9 @@ class CapitalEfficiency:
     capital_deployed: Optional[Decimal]
     profit: Optional[Decimal]
 
+    # The raw capital multiple: profit / capital deployed over the horizon,
+    # with no time adjustment. Reported alongside the score because it is the
+    # figure most operators check by instinct.
     return_on_capital: Optional[Decimal]
     capital_velocity: Optional[Decimal]
     annualized_return_on_capital: Optional[Decimal]
@@ -125,7 +130,11 @@ class CapitalEfficiency:
             "notes": list(self.notes),
             "inputs": dict(self.inputs),
             "confidence": self.confidence.value,
-            "provisional": True,
+            # No "provisional" boolean. The metric is authoritative, and where
+            # its target came from is stated precisely in
+            # inputs["target_return_source"] — "investor profile", "deal
+            # assumptions" or "Atlas default". A single flag would collapse
+            # three meaningfully different answers into one.
         }
 
 
@@ -219,6 +228,9 @@ def compute_capital_efficiency(
         )
 
     capital_free = capital <= 0
+    # The raw capital multiple: profit / capital deployed over the horizon,
+    # with no time adjustment. Reported alongside the score because it is the
+    # figure most operators check by instinct.
     return_on_capital: Optional[Decimal] = None
     velocity: Optional[Decimal] = None
     annualized: Optional[Decimal] = None

@@ -266,14 +266,14 @@ Scoring rules that keep the ranking honest:
 
 ---
 
-## Capital efficiency (provisional, additive)
+## Capital efficiency (authoritative)
 
-A second opinion reported alongside the deal score. It does **not** change the
-deal score or the strategy ranking; wiring it into the ranking is a decision to
-make against calibration evidence, not in advance of it.
-
-The question it answers is not "how much does this make?" but "how hard does
-each dollar work, and how long is it stuck?"
+**One definition, used everywhere.** The strategy ranking reads this exact
+score, and the UI displays the same figure. A second, non-time-adjusted
+definition previously lived inside the ranking; it compared a flip's one-off
+exit profit and a rental's annual cash flow against the same benchmark, and it
+disagreed with what the user was shown. It has been removed, and a test asserts
+no competing implementation can reappear.
 
 ```
 transactional (wholesale, flip):
@@ -286,27 +286,31 @@ annual income (buy & hold, BRRRR, seller finance):
 The split matters. A flip's profit lands once at exit; a rental's is a yearly
 figure that repeats. Annualising the second one again would double it.
 
-Scored on the same convention as the strategy ranker: hitting the target return
-scores 50, twice the target scores 100. The target is the investor's minimum
-ROI if stated, otherwise the deal's flip ROI target, otherwise 20%.
+Scored on the same convention as the other ranking dimensions: hitting the
+target return scores 50, twice the target scores 100. The target is the
+investor's minimum ROI if stated, otherwise the deal's flip ROI target,
+otherwise 20% — and which of the three applied is reported in
+`inputs.target_return_source` rather than reduced to a boolean.
 
-Also reported, all visible in the UI: capital velocity (turnover per year),
-profit per $1,000 deployed, capital recycled at refinance (BRRRR), and the share
-of the investor's available capital the deal would consume.
+Also reported, all visible in the UI: the **capital multiple**
+(`return_on_capital` — raw profit ÷ capital, no time adjustment), capital
+velocity (turnover per year), profit per $1,000 deployed, capital recycled at
+refinance (BRRRR), and the share of the investor's available capital consumed.
 
 Two rules keep it honest:
 
 - **A profitable strategy needing no capital scores 100.** Return on zero
-  capital is undefined, not infinite, and not zero. Scoring it zero would
-  punish a wholesale for the very property that makes it attractive.
+  capital is undefined, not infinite, and not zero.
 - **Efficiency and affordability stay separate.** `score` says how well capital
-  is used; `within_capital_limit` says whether the investor can fund it. A deal
-  can be an excellent use of capital and still be impossible today. Collapsing
-  them into one number would hide which problem you have.
+  is used; `within_capital_limit` says whether the investor can fund it.
 
 Every figure publishes the inputs it used and a plain-English `formula`, so the
-score can be recomputed by hand. A metric nobody can check is a metric nobody
-should trust.
+score can be recomputed by hand.
+
+> **This changed strategy recommendations.** Time-adjusting capital efficiency
+> raises fast exits relative to slow ones. In a four-point price sweep on the
+> reference deal the recommendation changed at one price point. That is an
+> intentional correction, not a regression.
 
 ---
 

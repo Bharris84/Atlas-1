@@ -13,15 +13,18 @@ import {
 } from "@atlas/shared-types";
 
 /**
- * Capital efficiency, reported next to the ranking rather than folded into it.
+ * Capital efficiency — the same score the strategy ranking uses.
  *
- * Two things this panel is careful about:
+ * Three things this panel is careful about:
  *
  * 1. It shows the formula and the inputs, because a metric nobody can check by
  *    hand is a metric nobody should trust.
  * 2. It keeps efficiency and affordability visibly apart. A deal can be a
  *    superb use of capital and still be one you cannot fund, and collapsing
  *    those into one number would hide which problem you have.
+ * 3. It reports the raw capital multiple (profit / capital, no time
+ *    adjustment) next to the time-adjusted score, because the two answer
+ *    different questions and operators check both.
  */
 export function CapitalEfficiencyPanel({ analysis }: { analysis: AnalysisResponse }) {
   const metrics = analysis.capital_efficiency;
@@ -36,15 +39,10 @@ export function CapitalEfficiencyPanel({ analysis }: { analysis: AnalysisRespons
     <div className="card overflow-hidden">
       <div className="card-header">
         <div>
-          <h2 className="card-title">
-            Capital efficiency
-            <span className="ml-2 rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-ink-500">
-              provisional
-            </span>
-          </h2>
+          <h2 className="card-title">Capital efficiency</h2>
           <p className="mt-0.5 text-xs text-ink-500">
-            How hard each dollar works, and how long it is stuck. Reported alongside the
-            deal score — it does not change it.
+            How hard each dollar works, and how long it is stuck. This is the same score
+            the strategy ranking uses. It is separate from the deal score.
           </p>
         </div>
       </div>
@@ -84,12 +82,13 @@ export function CapitalEfficiencyPanel({ analysis }: { analysis: AnalysisRespons
               render={(m) => formatMonths(m.horizon_months)}
             />
             <Row
-              label="Return on capital"
+              label="Capital multiple"
               keys={computable}
               metrics={metrics}
               render={(m) =>
                 m.capital_free ? "no capital" : formatPercent(m.return_on_capital)
               }
+              hint="Raw profit ÷ capital deployed over the horizon, with no time adjustment."
             />
             <Row
               label="Turnover per year"
@@ -117,7 +116,7 @@ export function CapitalEfficiencyPanel({ analysis }: { analysis: AnalysisRespons
               keys={computable}
               metrics={metrics}
               render={(m) => formatScore(m.score)}
-              hint="Hitting the target return scores 50; twice the target scores 100."
+              hint="Authoritative — the strategy ranking uses this exact figure. Hitting the target return scores 50; twice the target scores 100."
             />
             <Row
               label="Within capital limit"
@@ -214,11 +213,19 @@ function Working({ metric }: { metric: CapitalEfficiency }) {
         <div>
           <h4 className="label mb-1.5">How it is calculated</h4>
           <p className="text-sm text-ink-700">{metric.formula}</p>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <ConfidenceBadge confidence={metric.confidence} />
             <span className="text-[11px] text-ink-500">
               inherited from the figures this is built on
             </span>
+            {metric.inputs.target_return_source && (
+              <span
+                className="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-600"
+                title="Where the target return came from. The score is authoritative; the target may still be an unvalidated default."
+              >
+                target from: {metric.inputs.target_return_source}
+              </span>
+            )}
           </div>
         </div>
         <div>

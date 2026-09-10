@@ -17,7 +17,11 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from .assumptions import StrategyRankingWeights
-from .capital_efficiency import CapitalEfficiency, compute_all_capital_efficiency
+from .capital_efficiency import (
+    CapitalEfficiency,
+    compute_all_capital_efficiency,
+    compute_capital_efficiency,
+)
 from .enums import Confidence, Strategy
 from .inputs import DealInputs
 from .money import D, MONTHS_PER_YEAR, Numeric, ZERO, ratio, safe_div
@@ -106,20 +110,14 @@ def _roi_score(result: StrategyResult, target_roi: Decimal) -> Decimal:
     return ZERO
 
 
-def _capital_efficiency_score(result: StrategyResult) -> Decimal:
-    """Profit per dollar of cash committed.
-
-    A strategy that requires no capital is maximally capital-efficient, but
-    only if it actually produces a profit — a zero-cash strategy earning
-    nothing scores zero, not 100.
-    """
-    profit = result.profit
-    cash = result.cash_required
-    if profit is None or profit <= 0:
-        return ZERO
-    if cash is None or cash <= 0:
-        return D("100")
-    return _capped(safe_div(profit, cash), D("0.5"))
+# Capital efficiency has ONE definition, in capital_efficiency.py. The ranking
+# reads the same score the user is shown.
+#
+# A second definition used to live here: profit/cash against a flat 0.5 target,
+# with no adjustment for how long the capital was committed. It compared a
+# flip's one-off exit profit and a rental's annual cash flow against the same
+# benchmark, which is not a like-for-like comparison, and it disagreed with the
+# figure displayed in the UI. It was removed rather than reconciled.
 
 
 @dataclass(frozen=True)
@@ -144,9 +142,24 @@ def score_strategy(
     result: StrategyResult,
     inputs: DealInputs,
     weights: Optional[StrategyRankingWeights] = None,
+    capital_efficiency: Optional[CapitalEfficiency] = None,
 ) -> StrategyScore:
+    """Score one strategy on the seven ranking dimensions.
+
+    ``capital_efficiency`` is the authoritative metric from
+    ``capital_efficiency.py``. It is passed in so the ranking and the UI cannot
+    diverge; when omitted it is computed here from the same function, which
+    keeps a direct call to this function honest rather than convenient.
+    """
     a = inputs.assumptions
     w = weights or a.ranking
+
+    if capital_efficiency is None:
+        capital_efficiency = compute_capital_efficiency(
+            result,
+            profile=inputs.investor_profile if inputs.investor_profile.is_stated else None,
+            target_return=a.flip.minimum_roi,
+        )
 
     # Profit benchmarks differ by strategy because the strategies produce
     # structurally different kinds of profit.
@@ -165,7 +178,10 @@ def score_strategy(
 
     components: Dict[str, Decimal] = {
         "profit": _capped(result.profit, profit_target),
-        "capital_efficiency": _capital_efficiency_score(result),
+        # The single authoritative score, identical to the one displayed.
+        "capital_efficiency": (
+            capital_efficiency.score if capital_efficiency.score is not None else ZERO
+        ),
         "roi": _roi_score(result, a.flip.minimum_roi),
         "cash_flow": _capped(result.monthly_cash_flow, a.rental.minimum_monthly_cash_flow),
         "equity_creation": _capped(result.equity_created, equity_target),
@@ -210,8 +226,8 @@ class StrategyComparison:
     viable_exit_count: int
     overall_confidence: Confidence
     missing_information: List[str] = field(default_factory=list)
-    # Provisional, additive metric. Reported alongside the ranking; it does NOT
-    # feed the ranking or the deal score. See capital_efficiency.py.
+    # The authoritative capital efficiency metric. This is the SAME score the
+    # ranking uses — see capital_efficiency.py.
     capital_efficiency: Dict[Strategy, CapitalEfficiency] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -320,9 +336,21 @@ def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
         Strategy.SELLER_FINANCE: analyze_seller_finance(inputs),
     }
 
+    # Computed BEFORE scoring, and passed into it. The ranking and the figure
+    # shown to the user are then the same number by construction, not by two
+    # implementations agreeing.
+    capital_efficiency = compute_all_capital_efficiency(
+        results,
+        profile=inputs.investor_profile if inputs.investor_profile.is_stated else None,
+        target_return=inputs.assumptions.flip.minimum_roi,
+    )
+
     viable = [r for r in results.values() if r.viable]
     scores = sorted(
-        (score_strategy(r, inputs) for r in viable),
+        (
+            score_strategy(r, inputs, capital_efficiency=capital_efficiency[r.strategy])
+            for r in viable
+        ),
         key=lambda s: s.score,
         reverse=True,
     )
@@ -340,15 +368,6 @@ def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
 
     missing = sorted({m for r in results.values() for m in r.missing_inputs})
     missing.extend(m for m in inputs.missing_fields() if m not in missing)
-
-    # Computed for every strategy, reported next to the ranking, and
-    # deliberately not fed back into it. Wiring it into the ranking is a
-    # decision to make against calibration evidence, not in advance of it.
-    capital_efficiency = compute_all_capital_efficiency(
-        results,
-        profile=inputs.investor_profile if inputs.investor_profile.is_stated else None,
-        target_return=inputs.assumptions.flip.minimum_roi,
-    )
 
     return StrategyComparison(
         results=results,

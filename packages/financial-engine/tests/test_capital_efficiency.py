@@ -207,8 +207,20 @@ class TestTransparency:
         metric = compute_capital_efficiency(_result(months=6))
         assert any("redeployed into a comparable deal" in n for n in metric.notes)
 
-    def test_the_metric_is_flagged_provisional_in_its_output(self):
-        assert compute_capital_efficiency(_result()).to_dict()["provisional"] is True
+    def test_the_origin_of_the_target_is_stated_not_flagged(self):
+        """Three different answers — investor, deal, Atlas default — are worth
+        distinguishing, so the source is reported rather than reduced to a
+        provisional/not boolean."""
+        bare = compute_capital_efficiency(_result())
+        assert bare.inputs["target_return_source"] == "Atlas default"
+
+        stated = compute_capital_efficiency(
+            _result(), profile=InvestorProfile(minimum_roi=D("0.25"))
+        )
+        assert stated.inputs["target_return_source"] == "investor profile"
+
+        from_deal = compute_capital_efficiency(_result(), target_return=D("0.30"))
+        assert from_deal.inputs["target_return_source"] == "deal assumptions"
 
     def test_serialises_to_json(self):
         import json
@@ -230,14 +242,62 @@ class TestIntegration:
         assert "capital_efficiency" in payload
         assert payload["capital_efficiency"]["flip"]["formula"]
 
-    def test_it_does_not_alter_the_deal_ranking(self, baseline):
-        """Additive means additive: the existing ranking must not move."""
-        first = analyze_all_strategies(baseline)
-        assert first.recommended is not None
-        # Same inputs, ranking unchanged by the presence of the new metric.
-        assert [s.strategy for s in first.scores] == [
-            s.strategy for s in analyze_all_strategies(baseline).scores
-        ]
+    def test_the_ranking_uses_the_score_the_user_is_shown(self, baseline):
+        """Anti-drift. This is the whole point of the consolidation.
+
+        Atlas previously carried two definitions of capital efficiency: one
+        driving the ranking, a different one displayed. They disagreed. There
+        is now one, and this asserts the ranking component is that exact value
+        for every strategy — not merely close to it.
+        """
+        comparison = analyze_all_strategies(baseline)
+        assert comparison.scores, "expected at least one viable strategy"
+        for score in comparison.scores:
+            displayed = comparison.capital_efficiency[score.strategy]
+            assert score.components["capital_efficiency"] == displayed.score, (
+                f"{score.strategy.value}: ranking used "
+                f"{score.components['capital_efficiency']} but the UI shows "
+                f"{displayed.score}"
+            )
+
+    def test_no_second_capital_efficiency_definition_exists(self):
+        """Guards against a competing implementation reappearing."""
+        from atlas_financial_engine import strategy_engine
+
+        assert not hasattr(strategy_engine, "_capital_efficiency_score")
+
+    def test_the_ranking_score_is_time_adjusted(self, baseline):
+        """The old ranking definition ignored holding period. This proves the
+        replacement does not: a faster exit must score higher on the same
+        profit and capital."""
+        from dataclasses import replace as dc_replace
+
+        from atlas_financial_engine import FlipAssumptions
+
+        fast = dc_replace(
+            baseline,
+            assumptions=dc_replace(
+                baseline.assumptions,
+                flip=FlipAssumptions(holding_months=3),
+            ),
+        )
+        slow = dc_replace(
+            baseline,
+            assumptions=dc_replace(
+                baseline.assumptions,
+                flip=FlipAssumptions(holding_months=12),
+            ),
+        )
+        fast_score = next(
+            s for s in analyze_all_strategies(fast).scores if s.strategy == Strategy.FLIP
+        )
+        slow_score = next(
+            s for s in analyze_all_strategies(slow).scores if s.strategy == Strategy.FLIP
+        )
+        assert (
+            fast_score.components["capital_efficiency"]
+            > slow_score.components["capital_efficiency"]
+        )
 
     def test_brrrr_reports_how_much_capital_is_recycled(self, baseline):
         metric = analyze_all_strategies(baseline).capital_efficiency[Strategy.BRRRR]

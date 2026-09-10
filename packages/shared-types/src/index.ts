@@ -163,8 +163,11 @@ export interface AiAnalysis {
 
 /**
  * Capital efficiency — how hard each dollar of capital works, and for how long
- * it is stuck. Provisional and additive: it is reported next to the ranking and
- * does NOT feed the ranking or the deal score.
+ * it is stuck.
+ *
+ * This is the single authoritative definition: the strategy ranking uses this
+ * exact `score`, and the UI displays it. `return_on_capital` is the raw capital
+ * multiple (profit / capital, no time adjustment), reported alongside.
  *
  * `inputs` and `formula` exist so a user can recompute the score by hand.
  */
@@ -193,7 +196,6 @@ export interface CapitalEfficiency {
   notes: string[];
   inputs: Record<string, string | null>;
   confidence: Confidence;
-  provisional: boolean;
 }
 
 export type RiskTolerance = "conservative" | "moderate" | "aggressive";

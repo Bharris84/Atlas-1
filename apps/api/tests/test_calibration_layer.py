@@ -86,7 +86,13 @@ class TestCapitalEfficiencyInAnalysis:
         assert flip["inputs"]["capital_deployed"]
         assert flip["inputs"]["profit"]
         assert flip["inputs"]["target_return"]
-        assert flip["provisional"] is True
+        # Where the target came from is stated precisely rather than as a
+        # single boolean.
+        assert flip["inputs"]["target_return_source"] in (
+            "investor profile",
+            "deal assumptions",
+            "Atlas default",
+        )
 
     def test_the_arithmetic_reproduces_from_the_published_inputs(
         self, client, analysis_payload
@@ -105,7 +111,8 @@ class TestCapitalEfficiencyInAnalysis:
         )
 
     def test_it_does_not_change_the_deal_score(self, client, analysis_payload):
-        """Additive means additive."""
+        """Capital efficiency drives the strategy RANKING but not the deal
+        score, which remains a separate seven-category rubric."""
         body = client.post("/api/analyze", json=analysis_payload).json()
         assert body["scoring"]["score"] is not None
         assert body["recommended_strategy"] is not None
