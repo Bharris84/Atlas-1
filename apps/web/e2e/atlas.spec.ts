@@ -23,6 +23,11 @@ async function fillDealInputs(page: Page) {
   await page.getByLabel("Monthly rent").fill("1800");
 }
 
+/** Assumption groups are collapsed <details>; the summary title toggles one. */
+async function openAssumptionGroup(page: Page, title: string) {
+  await page.getByText(title, { exact: true }).click();
+}
+
 test.describe("Deal analyzer", () => {
   test("underwrites all five strategies from manually entered numbers", async ({ page }) => {
     await page.goto("/analyzer");
@@ -109,6 +114,66 @@ test.describe("Deal analyzer", () => {
     });
     await page.getByRole("button", { name: "Fix & Flip detail" }).click();
     await expect(page.getByText("This strategy cannot be evaluated yet.")).toBeVisible();
+  });
+});
+
+test.describe("Unknown operating expenses", () => {
+  test("an unestablished expense is shown as unknown, not as a default", async ({
+    page,
+  }) => {
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+    await expect(page.getByRole("heading", { name: "Deal score" })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    await openAssumptionGroup(page, "Rental operating expenses");
+
+    // Scoped to the group that was opened: the same tags exist in the still
+    // collapsed Holding costs group, and a hidden match proves nothing.
+    const rental = page
+      .locator("details")
+      .filter({ has: page.getByText("Rental operating expenses", { exact: true }) });
+
+    // "default" would claim Atlas chose a figure. It chose nothing and left
+    // the expense out of the arithmetic, which is a different statement.
+    await expect(rental.getByText("not known").first()).toBeVisible();
+    await expect(
+      rental.getByText("Omitted from the result. Enter 0 if it does not apply.").first()
+    ).toBeVisible();
+
+    // Vacancy and management do have defensible defaults, and must keep
+    // saying so rather than being swept into "unknown".
+    await expect(rental.getByText("default").first()).toBeVisible();
+  });
+
+  test("unknown taxes and insurance force human review", async ({ page }) => {
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+
+    await expect(page.getByText("Human review").first()).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByText("Operating expenses not established", { exact: true })
+    ).toBeVisible();
+  });
+
+  test("entering the real figures changes the answer", async ({ page }) => {
+    await page.goto("/analyzer");
+    await fillDealInputs(page);
+
+    const cashFlow = strategyTable(page)
+      .getByRole("row", { name: /^Monthly cash flow/ })
+      .getByRole("cell")
+      .nth(3);
+    await expect(cashFlow).not.toHaveText("—", { timeout: 15_000 });
+    const overstated = await cashFlow.textContent();
+
+    await openAssumptionGroup(page, "Rental operating expenses");
+    await page.getByLabel("Annual taxes").last().fill("2400");
+    await page.getByLabel("Annual insurance").last().fill("1800");
+
+    // The expenses were not a rounding detail: they move the headline number.
+    await expect(cashFlow).not.toHaveText(overstated ?? "", { timeout: 15_000 });
   });
 });
 
@@ -219,9 +284,13 @@ test.describe("Calibration layer", () => {
     await expect(page.getByRole("heading", { name: /Capital efficiency/ })).toBeVisible({
       timeout: 15_000,
     });
-    // It is labelled provisional, and stated as additive to the deal score.
-    await expect(page.getByText("provisional").first()).toBeVisible();
-    await expect(page.getByText(/does not change it/)).toBeVisible();
+    // Capital efficiency is no longer a second opinion alongside the ranking:
+    // it IS the score the ranking uses. The panel has to say so, or a user
+    // seeing two numbers will reasonably assume they disagree.
+    await expect(
+      page.getByText(/same score the strategy ranking uses/)
+    ).toBeVisible();
+    await expect(page.getByText(/separate from the deal score/)).toBeVisible();
 
     // The working must be inspectable, or the metric is not checkable.
     await page.getByRole("button", { name: "How Fix & Flip was computed" }).click();

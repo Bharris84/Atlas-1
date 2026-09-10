@@ -7,7 +7,9 @@ makes an analysis auditable months after it was run.
 """
 
 from .assumptions import (
+    ASSUMPTIONS_SCHEMA_VERSION,
     Assumptions,
+    BLOCKING_UNKNOWN_EXPENSES,
     BrrrrAssumptions,
     FinancingTerms,
     FlipAssumptions,
@@ -17,7 +19,9 @@ from .assumptions import (
     SellerFinanceAssumptions,
     StrategyRankingWeights,
     TransactionCosts,
+    UNKNOWN_EXPENSE_NOTE,
     WholesaleAssumptions,
+    migrate_assumptions,
 )
 from .capital_efficiency import (
     CapitalEfficiency,
@@ -75,7 +79,7 @@ from .strategy_engine import (
     score_strategy,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "ActualOutcome",
@@ -94,7 +98,9 @@ __all__ = [
     "RiskTolerance",
     "compute_all_capital_efficiency",
     "compute_capital_efficiency",
+    "ASSUMPTIONS_SCHEMA_VERSION",
     "Assumptions",
+    "BLOCKING_UNKNOWN_EXPENSES",
     "BrrrrAssumptions",
     "Confidence",
     "Criterion",
@@ -106,6 +112,8 @@ __all__ = [
     "FlipAssumptions",
     "HoldingCosts",
     "PROVISIONAL_DEFAULTS_NOTE",
+    "UNKNOWN_EXPENSE_NOTE",
+    "migrate_assumptions",
     "ProjectCosts",
     "PropertyFacts",
     "RehabBasis",

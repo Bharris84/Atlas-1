@@ -155,6 +155,10 @@ Notable decisions, each explained in `docs/financial-model.md`:
   cash, not opportunity.
 - **Undefined is not zero.** No debt means no DSCR. No cash in the deal means
   cash-on-cash is undefined, not infinite. These come back as `null`.
+- **Zero is an answer; blank is not.** Taxes, insurance, HOA and utilities have
+  no default, because there is no defensible one. An unknown expense is left
+  out of the arithmetic rather than guessed — which overstates the result, so
+  it caps confidence at MEDIUM and blocks a PURSUE verdict until it is entered.
 - **Unassessable is not average.** Scoring categories Atlas cannot evaluate are
   excluded and the coverage is reported, rather than padded with a guess.
 - **Hard risks beat good scores.** An unverified ARV or a suspected structural

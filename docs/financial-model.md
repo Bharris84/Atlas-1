@@ -19,6 +19,10 @@ the audit trail.
   with no rent estimate is not a property that rents for nothing.
 - **Undefined means undefined.** Division by zero returns `None`, which reaches
   the UI as `null` and renders as "—", never as `0%`.
+- **Zero is an answer.** Operating expenses are tri-state — a figure, an
+  explicit `0`, or unknown — so "this property has no HOA" and "nobody has
+  checked" are different statements. See [Unknown operating
+  expenses](#unknown-operating-expenses).
 
 ---
 
@@ -32,6 +36,8 @@ acquisition closing   = purchase price x 2%          + flat
 rehab total           = rehab x (1 + contingency)
 holding costs         = monthly holding x months
   monthly holding     = taxes/12 + insurance/12 + HOA + utilities + other
+                        (unknown components are omitted, never guessed —
+                         see Unknown operating expenses)
 financing costs       = points + interest + lender fees
   loan                = purchase x LTP + rehab total x LTR
   interest            = purchase loan x f + rehab loan x f x draw factor
@@ -145,6 +151,7 @@ gross scheduled rent  = monthly rent x 12
   - vacancy
 = effective gross income
   - management, maintenance, CapEx, taxes, insurance, HOA, other
+    (unknown expenses are omitted, which overstates NOI — and is reported)
 = NOI
   - debt service
 = cash flow
@@ -175,6 +182,75 @@ material:
 | Minimum cash-on-cash | 8% |
 | Target DSCR | 1.25 |
 | Financing | Conventional: 25% down, 7%, 30-year |
+| Taxes, insurance, HOA | **No default.** Unknown until entered |
+
+---
+
+## Unknown operating expenses
+
+Taxes, insurance, HOA and utilities have no default, because there is no
+defensible one. They are property-specific facts, not modelling choices: a
+$2,400 tax bill in Tennessee and an $8,000 one in New Jersey are the same
+model with different facts. Atlas therefore treats them as **tri-state**:
+
+| State | Stored as | Meaning |
+|---|---|---|
+| A figure | `Decimal("2400")` | Known — from the county record, a quote, a bill |
+| Explicit zero | `Decimal("0")` | The expense genuinely does not apply |
+| Unknown | `None` | Nobody has found out yet |
+
+### What the engine does with an unknown
+
+It leaves it out of the arithmetic. It does not substitute a national average,
+a percentage of value, or any other invented figure.
+
+Omission is the wrong answer in a known direction: NOI and cash flow come out
+**too high**, by exactly the missing amount and never by more. That is the
+honest direction to be wrong in, because a guess would be indistinguishable
+from a known figure in the output. It is only acceptable because the omission
+is reported everywhere the number appears:
+
+- `missing_information` names each unknown by its section (`rental.annual_taxes`).
+- Every viable strategy's **confidence is capped at MEDIUM**, with a reason
+  string. However good the comps are, a cash flow missing an expense the
+  property certainly incurs is not a high-confidence figure.
+- A blocking `operating_expenses_unknown` risk flag forces
+  `HUMAN_REVIEW_REQUIRED`, so no unknown-expense deal can be recommended for
+  pursuit.
+- The assumptions editor tags the field "not known", not "default".
+
+### Why taxes and insurance block, and HOA and utilities do not
+
+Only unknown **taxes and insurance** block a PURSUE verdict. Every US property
+is taxed and every lender requires insurance, so a missing figure there is
+always an omission, never a real zero — and on a typical single-family rental
+the pair runs to several hundred dollars a month, enough to flip the buy box
+from NOT MET to MET on its own.
+
+HOA and utilities are reported as unknown but do not block. Most properties
+have no association and many rentals are tenant-metered, so an unknown there is
+frequently a genuine zero. A flag that fires on nearly every deal is a flag
+nobody reads.
+
+### Why this needed a schema version
+
+Before this change, these fields defaulted to `Decimal("0")`, and that zero was
+how "unfilled" was represented. Reading an old stored analysis under the new
+rules would turn each one into a confident claim that the property has no tax
+bill — not merely stale, but asserting something false at unchanged confidence.
+
+So an assumptions blob carries `schema_version`. Version 0 (or a blob that
+declares no version) is read with the old meaning: a stored `0` for taxes,
+insurance or HOA becomes unknown, and holding utilities keep the `$150` they
+were actually computed with, so a saved analysis still reproduces. Version 1
+means what it says. `deal_analyses.assumptions_schema_version` records the same
+number as a column so legacy rows can be found with a query.
+
+A blob with no declared version is treated as legacy. That is deliberate: every
+blob written before version 1 lacks the key, so defaulting to "current" would
+silently reinterpret all of them, whereas defaulting to legacy can only
+inconvenience a caller who omits the version — and does so visibly, because the
+value comes back unknown and the analysis says so.
 
 ---
 
@@ -408,6 +484,12 @@ walkthrough → MEDIUM; per-square-foot rule of thumb → LOW; nothing → LOW.
 
 A low/high range spanning more than 15% of its midpoint costs one confidence
 level, and says so.
+
+**Unknown operating expenses cap every strategy at MEDIUM**, whatever the
+evidence behind the ARV and the rent. The confidence engine rates where the
+value and rent estimates came from; it says nothing about the expense sheet, so
+without this cap a deal missing its entire tax and insurance bill could and did
+report HIGH.
 
 **Combination is weakest-link.** An analysis built on a HIGH-confidence ARV and
 a LOW-confidence rehab is a LOW-confidence analysis. Every downgrade carries a

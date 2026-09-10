@@ -47,7 +47,13 @@ so resist correcting it with hindsight.
     "monthly_rent": "1800",
     "evidence": { "arv_basis": "comparable_sales", "comp_count": 3 },
     "assumptions": {
-      "holding": { "annual_taxes": "2400", "annual_insurance": "1800" }
+      "schema_version": 1,
+      "holding": {
+        "annual_taxes": "2400",
+        "annual_insurance": "1800",
+        "monthly_hoa": "0",
+        "monthly_utilities": "150"
+      }
     }
   },
   "actual": {
@@ -60,6 +66,15 @@ so resist correcting it with hindsight.
   }
 }
 ```
+
+**Fill in the whole expense sheet, including the zeros.** Taxes, insurance, HOA
+and utilities have no defaults; anything left out is treated as unknown and
+omitted from the arithmetic, which inflates the *predicted* profit and makes the
+report blame the gap on whichever factor you did supply. Write `"0"` where an
+expense genuinely did not apply — that is an answer, and it is a different one
+from leaving the field out. `"schema_version": 1` tells Atlas the file speaks
+the current assumption semantics; without it a `"0"` is read the old way, as
+"not filled in".
 
 **`actual_profit` must be on the same basis as the strategy's profit.** An exit
 profit for wholesale and flip; an **annual cash flow** for buy & hold, BRRRR and

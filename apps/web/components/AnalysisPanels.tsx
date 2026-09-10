@@ -8,6 +8,7 @@ import {
   SeverityBadge,
   VerdictBadge,
 } from "@/components/Badges";
+import { describeAssumptionPath } from "@/lib/assumptions";
 import { EMPTY, formatPercent, formatScore, humanise } from "@/lib/format";
 import {
   STRATEGY_LABELS,
@@ -162,8 +163,9 @@ export function MissingInfoPanel({ analysis }: { analysis: AnalysisResponse }) {
         ) : (
           <>
             <p className="mb-2 text-sm text-ink-600">
-              These are absent, not zero. Their absence limits what the analysis can
-              conclude.
+              These are absent, not zero. Expenses listed here were left out of the
+              arithmetic rather than guessed, so the figures above read better than
+              the property does. Enter 0 where one genuinely does not apply.
             </p>
             <ul className="flex flex-wrap gap-2">
               {missing.map((field) => (
@@ -171,7 +173,7 @@ export function MissingInfoPanel({ analysis }: { analysis: AnalysisResponse }) {
                   key={field}
                   className="rounded border border-caution-500/40 bg-caution-50 px-2 py-1 text-xs font-medium text-caution-700"
                 >
-                  {humanise(field)}
+                  {describeAssumptionPath(field) ?? humanise(field)}
                 </li>
               ))}
             </ul>

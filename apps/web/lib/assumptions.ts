@@ -13,11 +13,30 @@
 
 export type FieldKind = "money" | "percent" | "months" | "years" | "ratio";
 
+/**
+ * Which generation of assumption semantics this client speaks. Must match
+ * ASSUMPTIONS_SCHEMA_VERSION in the Python engine
+ * (packages/financial-engine/src/atlas_financial_engine/assumptions.py).
+ *
+ * It is sent with every assumptions payload. A blob that does not declare a
+ * version is read by the API with pre-tri-state semantics, where a 0 for taxes
+ * or insurance meant "unfilled" — so omitting it would silently discard a
+ * user's deliberate zero.
+ */
+export const ASSUMPTIONS_SCHEMA_VERSION = 1;
+
 export interface AssumptionField {
   path: string;
   label: string;
   kind: FieldKind;
   help?: string;
+  /**
+   * Property-specific expenses with no defensible default. Blank means nobody
+   * has found out, not zero, and the engine leaves them out of the arithmetic
+   * rather than guessing. The UI must render that difference: an empty box
+   * tagged "default" would claim Atlas had chosen a figure.
+   */
+  unknownable?: boolean;
 }
 
 export interface AssumptionGroup {
@@ -62,10 +81,34 @@ export const ASSUMPTION_GROUPS: AssumptionGroup[] = [
     title: "Holding costs",
     description: "Carrying costs while the property is owned but not earning.",
     fields: [
-      { path: "holding.annual_taxes", label: "Annual taxes", kind: "money" },
-      { path: "holding.annual_insurance", label: "Annual insurance", kind: "money" },
-      { path: "holding.monthly_utilities", label: "Monthly utilities", kind: "money" },
-      { path: "holding.monthly_hoa", label: "Monthly HOA", kind: "money" },
+      {
+        path: "holding.annual_taxes",
+        label: "Annual taxes",
+        kind: "money",
+        unknownable: true,
+        help: "From the county record. Every property is taxed, so leaving this blank overstates every result.",
+      },
+      {
+        path: "holding.annual_insurance",
+        label: "Annual insurance",
+        kind: "money",
+        unknownable: true,
+        help: "A real quote. Coastal and older-home premiums vary by multiples.",
+      },
+      {
+        path: "holding.monthly_utilities",
+        label: "Monthly utilities",
+        kind: "money",
+        unknownable: true,
+        help: "What it costs to keep the lights and heat on while the property is empty. Enter 0 if they stay off.",
+      },
+      {
+        path: "holding.monthly_hoa",
+        label: "Monthly HOA",
+        kind: "money",
+        unknownable: true,
+        help: "Enter 0 if there is no association, so it stops being reported as unknown.",
+      },
     ],
   },
   {
@@ -107,9 +150,27 @@ export const ASSUMPTION_GROUPS: AssumptionGroup[] = [
       { path: "rental.management_percent", label: "Management", kind: "percent" },
       { path: "rental.maintenance_percent", label: "Maintenance", kind: "percent" },
       { path: "rental.capex_percent", label: "CapEx", kind: "percent" },
-      { path: "rental.annual_taxes", label: "Annual taxes", kind: "money" },
-      { path: "rental.annual_insurance", label: "Annual insurance", kind: "money" },
-      { path: "rental.monthly_hoa", label: "Monthly HOA", kind: "money" },
+      {
+        path: "rental.annual_taxes",
+        label: "Annual taxes",
+        kind: "money",
+        unknownable: true,
+        help: "From the county record. Left blank it is omitted from NOI, which overstates cash flow.",
+      },
+      {
+        path: "rental.annual_insurance",
+        label: "Annual insurance",
+        kind: "money",
+        unknownable: true,
+        help: "A real landlord-policy quote, not the owner-occupied premium.",
+      },
+      {
+        path: "rental.monthly_hoa",
+        label: "Monthly HOA",
+        kind: "money",
+        unknownable: true,
+        help: "Enter 0 if there is no association.",
+      },
       {
         path: "rental.minimum_monthly_cash_flow",
         label: "Minimum cash flow",
@@ -236,6 +297,22 @@ export const ALL_ASSUMPTION_FIELDS: AssumptionField[] = ASSUMPTION_GROUPS.flatMa
 
 export function findField(path: string): AssumptionField | undefined {
   return ALL_ASSUMPTION_FIELDS.find((field) => field.path === path);
+}
+
+/**
+ * A readable name for a dotted assumption path, as reported in
+ * `missing_information` and a strategy's `missing_inputs`.
+ *
+ * Built from the field list rather than a second lookup table, so a field
+ * renamed in one place cannot go on being described by its old name in the
+ * other. Returns null for anything that is not an assumption path — a plain
+ * input like `purchase_price` — leaving the caller to fall back.
+ */
+export function describeAssumptionPath(path: string): string | null {
+  const field = findField(path);
+  if (!field) return null;
+  const group = ASSUMPTION_GROUPS.find((g) => g.fields.some((f) => f.path === path));
+  return group ? `${field.label} — ${group.title.toLowerCase()}` : field.label;
 }
 
 /** Read a dotted path out of a nested object. */

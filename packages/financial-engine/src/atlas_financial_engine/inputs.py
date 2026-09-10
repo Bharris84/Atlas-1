@@ -118,10 +118,12 @@ class DealInputs:
             missing.append("rehab")
         if self.monthly_rent is None:
             missing.append("monthly_rent")
-        if self.assumptions.rental.annual_taxes == 0:
-            missing.append("annual_taxes")
-        if self.assumptions.rental.annual_insurance == 0:
-            missing.append("annual_insurance")
+        # Operating expenses are tri-state: an explicit 0 is an answer ("this
+        # property has no HOA"), so only None counts as missing. Reported with
+        # their section because holding-period taxes and rental-period taxes
+        # are separately editable and can legitimately differ.
+        for section, unknown in self.assumptions.unknown_expenses().items():
+            missing.extend(f"{section}.{name}" for name in unknown)
         return missing
 
     def to_dict(self) -> Dict[str, Any]:

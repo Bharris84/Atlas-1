@@ -31,13 +31,17 @@
           "property_visited": true
         },
         "assumptions": {
+          "schema_version": 1,
           "holding": {
             "annual_taxes": "2400",
-            "annual_insurance": "1800"
+            "annual_insurance": "1800",
+            "monthly_hoa": "0",
+            "monthly_utilities": "150"
           },
           "rental": {
             "annual_taxes": "2400",
-            "annual_insurance": "1800"
+            "annual_insurance": "1800",
+            "monthly_hoa": "0"
           }
         }
       },
@@ -66,9 +70,12 @@
           "property_visited": true
         },
         "assumptions": {
+          "schema_version": 1,
           "holding": {
             "annual_taxes": "1900",
-            "annual_insurance": "1500"
+            "annual_insurance": "1500",
+            "monthly_hoa": "0",
+            "monthly_utilities": "150"
           }
         }
       },
@@ -95,13 +102,17 @@
           "property_visited": true
         },
         "assumptions": {
+          "schema_version": 1,
           "rental": {
             "annual_taxes": "1500",
-            "annual_insurance": "1600"
+            "annual_insurance": "1600",
+            "monthly_hoa": "0"
           },
           "holding": {
             "annual_taxes": "1500",
-            "annual_insurance": "1600"
+            "annual_insurance": "1600",
+            "monthly_hoa": "0",
+            "monthly_utilities": "150"
           }
         }
       },

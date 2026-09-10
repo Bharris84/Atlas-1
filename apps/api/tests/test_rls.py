@@ -92,6 +92,9 @@ def rls_db():
             conn.execute(SHIM.read_text())
             conn.execute((MIGRATIONS / "0002_row_level_security.sql").read_text())
             conn.execute((MIGRATIONS / "0003_investor_profile.sql").read_text())
+            conn.execute(
+                (MIGRATIONS / "0004_assumptions_schema_version.sql").read_text()
+            )
 
             conn.execute(
                 f"""

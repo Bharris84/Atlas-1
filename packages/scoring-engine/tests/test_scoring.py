@@ -168,6 +168,95 @@ class TestUnassessableCategories:
         assert result.verdict == Verdict.PURSUE
 
 
+class TestUnknownOperatingExpenses:
+    """The evidence for making this a blocking flag rather than a warning.
+
+    A deal with no tax or insurance figure reads as MORE attractive than the
+    same deal with real ones — the missing expenses are pure upside in the
+    arithmetic. Nothing else in the pipeline catches it: the confidence engine
+    rates the ARV and the rent, not the expense sheet, so a well-comped deal
+    still reported HIGH confidence and PURSUE while overstating monthly cash
+    flow by the entire tax and insurance bill.
+    """
+
+    def _without_expenses(self, deal: DealInputs) -> DealInputs:
+        return replace(
+            deal,
+            assumptions=replace(
+                deal.assumptions,
+                rental=replace(
+                    deal.assumptions.rental, annual_taxes=None, annual_insurance=None
+                ),
+                holding=replace(
+                    deal.assumptions.holding, annual_taxes=None, annual_insurance=None
+                ),
+            ),
+        )
+
+    def test_unknown_expenses_block_pursue(self, strong_deal: DealInputs):
+        cheap = replace(strong_deal, purchase_price=D("60000"))
+        assert _score(cheap).verdict == Verdict.PURSUE
+
+        result = _score(self._without_expenses(cheap))
+        assert result.verdict == Verdict.HUMAN_REVIEW_REQUIRED
+        assert "Operating expenses not established" in result.verdict_reason
+
+    def test_the_flag_is_critical_and_names_what_is_missing(
+        self, strong_deal: DealInputs
+    ):
+        deal = self._without_expenses(strong_deal)
+        flags = all_risk_flags(deal, analyze_all_strategies(deal))
+        flag = next(f for f in flags if f.code == "operating_expenses_unknown")
+        assert flag.severity == RiskSeverity.CRITICAL
+        assert flag.blocks_pursue is True
+        assert "property taxes" in flag.detail
+        assert "insurance" in flag.detail
+
+    def test_an_explicit_zero_does_not_raise_the_flag(self, strong_deal: DealInputs):
+        """A tax-abated, self-insured or HOA-free property is a real thing, and
+        saying so must clear the flag. Otherwise the only way past it is to
+        invent a number, which is the behaviour this replaced."""
+        answered = replace(
+            strong_deal,
+            assumptions=replace(
+                strong_deal.assumptions,
+                rental=replace(
+                    strong_deal.assumptions.rental,
+                    annual_taxes=D("0"),
+                    annual_insurance=D("0"),
+                ),
+            ),
+        )
+        codes = [
+            f.code for f in all_risk_flags(answered, analyze_all_strategies(answered))
+        ]
+        assert "operating_expenses_unknown" not in codes
+
+    def test_a_complete_expense_sheet_raises_no_flag(self, strong_deal: DealInputs):
+        codes = [
+            f.code
+            for f in all_risk_flags(strong_deal, analyze_all_strategies(strong_deal))
+        ]
+        assert "operating_expenses_unknown" not in codes
+
+    def test_missing_expenses_make_the_deal_look_better_not_worse(
+        self, strong_deal: DealInputs
+    ):
+        """Stated plainly because it is the reason the flag has to block.
+
+        A risk that improves every visible number cannot be left to a warning
+        the user scrolls past.
+        """
+        with_expenses = analyze_all_strategies(strong_deal)
+        without = analyze_all_strategies(self._without_expenses(strong_deal))
+        from atlas_financial_engine import Strategy
+
+        assert (
+            without.results[Strategy.BUY_HOLD].monthly_cash_flow
+            > with_expenses.results[Strategy.BUY_HOLD].monthly_cash_flow
+        )
+
+
 class TestRiskOverrides:
     def test_a_blocking_flag_beats_a_good_score(self, strong_deal: DealInputs):
         flagged = replace(strong_deal, risk_flags=["structural_concern"])

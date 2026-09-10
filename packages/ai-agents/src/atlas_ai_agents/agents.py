@@ -266,10 +266,18 @@ def _research_deterministic(
         questions.append("Walk the property, or get someone trusted to walk it.")
     if not evidence.title_reviewed:
         questions.append("Order a title search before committing to a contract price.")
-    if inputs.assumptions.rental.annual_taxes == 0:
+    # `is None` and not `== 0`: an explicit zero is an answer, and asking the
+    # user to re-establish a figure they already entered is how a checklist
+    # trains people to stop reading it.
+    unknown_expenses = inputs.assumptions.rental.unknown_fields()
+    if "annual_taxes" in unknown_expenses:
         questions.append("Pull the actual property tax bill from the county record.")
-    if inputs.assumptions.rental.annual_insurance == 0:
+    if "annual_insurance" in unknown_expenses:
         questions.append("Get an insurance quote; premiums vary widely by state and age.")
+    if "monthly_hoa" in unknown_expenses:
+        questions.append(
+            "Confirm whether the property is in an HOA, and record 0 if it is not."
+        )
 
     for result in comparison.results.values():
         risks.extend(result.warnings)
@@ -408,15 +416,16 @@ def _underwriting_challenges(
             "Nobody has walked the property. Condition risk is entirely unpriced."
         )
 
-    if inputs.assumptions.rental.annual_taxes == 0:
+    unknown_expenses = inputs.assumptions.rental.unknown_fields()
+    if "annual_taxes" in unknown_expenses:
         challenges.append(
-            "Property taxes are zero in these assumptions, which overstates NOI and "
-            "every rental return that depends on it."
+            "Property taxes are not established, so they are absent from these "
+            "figures. That overstates NOI and every rental return derived from it."
         )
-    if inputs.assumptions.rental.annual_insurance == 0:
+    if "annual_insurance" in unknown_expenses:
         challenges.append(
-            "Insurance is zero in these assumptions. In coastal and older-home markets "
-            "this is a material omission."
+            "Insurance is not established and is therefore missing from these "
+            "figures. In coastal and older-home markets that is a material omission."
         )
 
     flip = comparison.results.get(Strategy.FLIP)

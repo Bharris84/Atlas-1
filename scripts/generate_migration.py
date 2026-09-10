@@ -45,7 +45,10 @@ def generate() -> str:
     statements = []
     for table in Base.metadata.sorted_tables:
         statements.append(str(CreateTable(table).compile(dialect=dialect)).strip() + ";")
-        for index in table.indexes:
+        # table.indexes is a set: without sorting, regenerating shuffles the
+        # CREATE INDEX lines and every `make migration` produces a diff that
+        # says nothing.
+        for index in sorted(table.indexes, key=lambda i: i.name or ""):
             statements.append(str(CreateIndex(index).compile(dialect=dialect)).strip() + ";")
     return HEADER + "\n" + "\n\n".join(statements) + "\n\nCOMMIT;\n"
 

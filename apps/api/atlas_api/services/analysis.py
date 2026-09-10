@@ -26,6 +26,7 @@ from atlas_financial_engine import (
     Strategy,
     __version__ as engine_version,
     analyze_all_strategies,
+    migrate_assumptions,
 )
 from atlas_financial_engine.strategy_engine import StrategyComparison
 from atlas_scoring_engine import DealScore, score_deal
@@ -55,12 +56,22 @@ def resolve_assumptions(
     user_defaults: Optional[Dict[str, Any]],
     request_overrides: Optional[Dict[str, Any]],
 ) -> Assumptions:
-    """Engine defaults < the user's saved buy box < this deal's overrides."""
+    """Engine defaults < the user's saved buy box < this deal's overrides.
+
+    Each source is brought up to the current assumption schema BEFORE the
+    merge, not after. The two can be different generations — a buy box saved
+    last year merged with an override typed this morning — and migrating the
+    merged result would apply the older source's semantics to the newer one's
+    values, turning a deliberate 0 into an unknown.
+
+    A source that does not declare ``schema_version`` is read as legacy; see
+    ``migrate_assumptions``. Clients of this API should send the current
+    version with any assumptions they set.
+    """
     merged: Dict[str, Any] = {}
-    if user_defaults:
-        merged = _deep_merge(merged, user_defaults)
-    if request_overrides:
-        merged = _deep_merge(merged, request_overrides)
+    for source in (user_defaults, request_overrides):
+        if source:
+            merged = _deep_merge(merged, dict(migrate_assumptions(source)))
     return Assumptions.from_dict(merged) if merged else Assumptions()
 
 
@@ -291,6 +302,9 @@ def apply_to_model(
     if ai_output is not None:
         analysis.ai_analysis_json = ai_output
     analysis.engine_version = engine_version
+    # a.schema_version, not the module constant: whatever generation these
+    # assumptions were actually built under is what the blob means.
+    analysis.assumptions_schema_version = a.schema_version
     return analysis
 
 

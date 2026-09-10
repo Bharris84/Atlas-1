@@ -29,7 +29,11 @@ from atlas_financial_engine.costs import (
 from atlas_financial_engine.money import D
 
 TX = TransactionCosts()
-HOLD = HoldingCosts(annual_taxes=D("2400"), annual_insurance=D("1800"))
+# Utilities are stated explicitly: since expenses became tri-state there is
+# no default figure to inherit, and an unstated one would be omitted.
+HOLD = HoldingCosts(
+    annual_taxes=D("2400"), annual_insurance=D("1800"), monthly_utilities=D("150")
+)
 
 
 def _costs(price, rehab="45000", financing=DEFAULT_HARD_MONEY, months=6, sale="250000"):

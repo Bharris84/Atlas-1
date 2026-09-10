@@ -24,11 +24,11 @@ CREATE TABLE activity_log (
 	PRIMARY KEY (id)
 );
 
-CREATE INDEX ix_activity_log_entity_id ON activity_log (entity_id);
-
 CREATE INDEX ix_activity_log_action ON activity_log (action);
 
 CREATE INDEX ix_activity_log_actor_id ON activity_log (actor_id);
+
+CREATE INDEX ix_activity_log_entity_id ON activity_log (entity_id);
 
 CREATE INDEX ix_activity_log_occurred_at ON activity_log (occurred_at);
 
@@ -60,15 +60,15 @@ CREATE TABLE properties (
 	PRIMARY KEY (id)
 );
 
-CREATE INDEX ix_properties_state ON properties (state);
-
-CREATE INDEX ix_properties_zip_code ON properties (zip_code);
-
 CREATE INDEX ix_properties_owner_id ON properties (owner_id);
 
 CREATE INDEX ix_properties_owner_state ON properties (owner_id, state);
 
 CREATE INDEX ix_properties_parcel_apn ON properties (parcel_apn);
+
+CREATE INDEX ix_properties_state ON properties (state);
+
+CREATE INDEX ix_properties_zip_code ON properties (zip_code);
 
 CREATE TABLE user_profiles (
 	id UUID NOT NULL, 
@@ -101,9 +101,9 @@ CREATE TABLE communications (
 	FOREIGN KEY(property_id) REFERENCES properties (id) ON DELETE CASCADE
 );
 
-CREATE INDEX ix_communications_property_id ON communications (property_id);
-
 CREATE INDEX ix_communications_owner_id ON communications (owner_id);
+
+CREATE INDEX ix_communications_property_id ON communications (property_id);
 
 CREATE TABLE comps (
 	id UUID NOT NULL, 
@@ -190,6 +190,7 @@ CREATE TABLE deal_analyses (
 	scoring_json JSON, 
 	ai_analysis_json JSON, 
 	engine_version VARCHAR(20), 
+	assumptions_schema_version INTEGER DEFAULT '0' NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, 
 	PRIMARY KEY (id), 
@@ -198,11 +199,11 @@ CREATE TABLE deal_analyses (
 
 CREATE INDEX ix_deal_analyses_owner_id ON deal_analyses (owner_id);
 
-CREATE INDEX ix_deal_analyses_verdict ON deal_analyses (verdict);
-
 CREATE INDEX ix_deal_analyses_property_id ON deal_analyses (property_id);
 
 CREATE INDEX ix_deal_analyses_recommended_strategy ON deal_analyses (recommended_strategy);
+
+CREATE INDEX ix_deal_analyses_verdict ON deal_analyses (verdict);
 
 CREATE TABLE leads (
 	id UUID NOT NULL, 
@@ -219,9 +220,9 @@ CREATE TABLE leads (
 	FOREIGN KEY(property_id) REFERENCES properties (id) ON DELETE CASCADE
 );
 
-CREATE INDEX ix_leads_property_id ON leads (property_id);
-
 CREATE INDEX ix_leads_owner_id ON leads (owner_id);
+
+CREATE INDEX ix_leads_property_id ON leads (property_id);
 
 CREATE INDEX ix_leads_status ON leads (status);
 
@@ -242,11 +243,11 @@ CREATE TABLE offers (
 	FOREIGN KEY(property_id) REFERENCES properties (id) ON DELETE CASCADE
 );
 
-CREATE INDEX ix_offers_status ON offers (status);
+CREATE INDEX ix_offers_owner_id ON offers (owner_id);
 
 CREATE INDEX ix_offers_property_id ON offers (property_id);
 
-CREATE INDEX ix_offers_owner_id ON offers (owner_id);
+CREATE INDEX ix_offers_status ON offers (status);
 
 CREATE TABLE owners (
 	id UUID NOT NULL, 
@@ -287,9 +288,9 @@ CREATE TABLE rehab_projects (
 	FOREIGN KEY(property_id) REFERENCES properties (id) ON DELETE CASCADE
 );
 
-CREATE INDEX ix_rehab_projects_property_id ON rehab_projects (property_id);
-
 CREATE INDEX ix_rehab_projects_owner_id ON rehab_projects (owner_id);
+
+CREATE INDEX ix_rehab_projects_property_id ON rehab_projects (property_id);
 
 CREATE TABLE assumption_audit (
 	id UUID NOT NULL, 

@@ -34,6 +34,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from atlas_financial_engine.assumptions import ASSUMPTIONS_SCHEMA_VERSION
+
 MONEY = Numeric(14, 2)
 RATE = Numeric(12, 6)
 SMALL = Numeric(10, 2)
@@ -265,6 +267,14 @@ class DealAnalysis(Base, TimestampMixin):
     scoring_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     ai_analysis_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON)
     engine_version: Mapped[Optional[str]] = mapped_column(String(20))
+    # Which generation of assumption semantics assumptions_json was written
+    # under. 0 is the pre-tri-state schema, where a stored 0 for taxes or
+    # insurance meant "unfilled" rather than "no tax bill" — the engine reads
+    # that back as unknown. Stored as a column as well as inside the blob so
+    # legacy analyses can be found with a query rather than a JSON scan.
+    assumptions_schema_version: Mapped[int] = mapped_column(
+        Integer, default=ASSUMPTIONS_SCHEMA_VERSION, server_default="0"
+    )
 
     property: Mapped["Property"] = relationship(back_populates="analyses")
     audit_entries: Mapped[List["AssumptionAudit"]] = relationship(

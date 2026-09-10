@@ -219,9 +219,41 @@ class TestPartialData:
         assert "rehab" in missing
         assert "monthly_rent" in missing
 
-    def test_zero_taxes_are_reported_as_missing_information(self):
-        """Zero is not a tax bill; it is an unanswered question."""
-        assert "annual_taxes" in build_inputs(purchase_price="150000").missing_fields()
+    def test_unknown_taxes_are_reported_as_missing_information(self):
+        """An unanswered question, reported with the section it belongs to."""
+        missing = build_inputs(purchase_price="150000").missing_fields()
+        assert "rental.annual_taxes" in missing
+        assert "holding.annual_taxes" in missing
+
+    def test_an_explicit_zero_is_an_answer_and_not_missing(self):
+        """The distinction the tri-state exists for.
+
+        "This property has no HOA" and "nobody has checked whether it has an
+        HOA" produce the same arithmetic and must not produce the same report.
+        """
+        from atlas_financial_engine.assumptions import (
+            Assumptions,
+            HoldingCosts,
+            RentalAssumptions,
+        )
+
+        answered = build_inputs(
+            purchase_price="150000",
+            assumptions=Assumptions(
+                holding=HoldingCosts(
+                    annual_taxes=D("2400"),
+                    annual_insurance=D("1800"),
+                    monthly_hoa=D("0"),
+                    monthly_utilities=D("0"),
+                ),
+                rental=RentalAssumptions(
+                    annual_taxes=D("2400"),
+                    annual_insurance=D("1800"),
+                    monthly_hoa=D("0"),
+                ),
+            ).to_dict(),
+        ).missing_fields()
+        assert not [m for m in answered if m.startswith(("holding.", "rental."))]
 
     def test_engine_works_with_no_external_data_provider(self):
         """Manual entry alone must be enough to produce a full analysis."""

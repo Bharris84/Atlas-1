@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ConfidenceBadge, MetBadge } from "@/components/Badges";
+import { describeAssumptionPath } from "@/lib/assumptions";
 import {
   EMPTY,
   formatByUnit,
@@ -220,7 +221,9 @@ function StrategyDetail({ result }: { result: StrategyResult }) {
           <p className="mt-2 text-ink-600">
             Missing:{" "}
             <span className="font-medium">
-              {result.missing_inputs.map(humanise).join(", ")}
+              {result.missing_inputs
+                .map((field) => describeAssumptionPath(field) ?? humanise(field))
+                .join(", ")}
             </span>
           </p>
         )}

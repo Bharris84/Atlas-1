@@ -7,6 +7,12 @@ and the API records an audit-trail entry whenever one changes.
 
 ``PROVISIONAL_DEFAULTS_NOTE`` is surfaced in the UI next to any value the user
 has not explicitly overridden.
+
+Operating expenses are the exception to "every field has a default". Taxes,
+insurance, HOA and utilities are ``Optional`` and default to ``None``, because
+there is no defensible default: they are property-specific facts, and the old
+zero default silently claimed a property had no tax bill. See
+``UNKNOWN_EXPENSE_NOTE``.
 """
 
 from __future__ import annotations
@@ -14,7 +20,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict, fields, is_dataclass, replace
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, Mapping, Optional, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from .enums import FinancingMethod
 from .money import D, Numeric
@@ -25,8 +41,54 @@ PROVISIONAL_DEFAULTS_NOTE = (
 )
 
 
+UNKNOWN_EXPENSE_NOTE = (
+    "Not known. Atlas leaves this out of the arithmetic rather than guessing, "
+    "so any figure derived from it is overstated until a real number is entered. "
+    "Enter 0 explicitly if the expense genuinely does not apply."
+)
+
+# Expenses whose absence Atlas treats as blocking. Every property in the United
+# States is taxed and every lender requires insurance, so a missing figure here
+# is always an omission, never a real zero — and omitting them overstates cash
+# flow by hundreds of dollars a month on a typical single-family rental.
+#
+# HOA and utilities are deliberately NOT on this list. Most properties have no
+# HOA, and utilities on a rental are frequently tenant-paid, so an unknown is
+# often a genuine zero. Atlas reports those as unknown but does not block on
+# them; blocking every deal for a fee most properties do not have would train
+# the user to ignore the flag.
+BLOCKING_UNKNOWN_EXPENSES = ("annual_taxes", "annual_insurance")
+
+# Bump when the meaning of a stored assumptions blob changes. Version 1 made
+# operating expenses tri-state; before it, a stored ``0`` for taxes or
+# insurance meant "nobody filled this in". ``Assumptions.from_dict`` reads a
+# missing or ``0`` version as legacy and preserves that original meaning, so
+# reloading an old analysis does not silently reinterpret it as a real zero.
+ASSUMPTIONS_SCHEMA_VERSION = 1
+
+_LEGACY_UNKNOWN_FIELDS = ("annual_taxes", "annual_insurance", "monthly_hoa")
+# The pre-tri-state default for utilities: an invented number, but an
+# intentional one. Legacy blobs keep it so their totals still reproduce.
+_LEGACY_UTILITIES_DEFAULT = "150"
+
+
 def _dec(value: Numeric) -> Decimal:
     return D(value)
+
+
+def known(value: Optional[Decimal]) -> Decimal:
+    """An unknown expense contributes nothing to the arithmetic.
+
+    This is NOT the old zero default wearing a new name. The difference is that
+    the omission is reported: anything calling this must also surface
+    ``unknown_fields()`` so the resulting figure is labelled incomplete. Used
+    on its own it would be exactly the bug this module was changed to fix.
+    """
+    return value if value is not None else D("0")
+
+
+def _unknown_among(source: Any, names: tuple) -> List[str]:
+    return [n for n in names if getattr(source, n) is None]
 
 
 @dataclass(frozen=True)
@@ -56,21 +118,42 @@ class HoldingCosts:
 
     Taxes and insurance are entered ANNUALLY because that is how they are
     quoted; everything else is monthly.
+
+    The four property-specific expenses are tri-state: a number is a known
+    figure, an explicit ``0`` means the expense does not apply, and ``None``
+    means nobody has found out yet. ``monthly_other`` stays a plain zero — it
+    is a catch-all for costs the user chooses to add, so "none added" is a
+    genuine zero rather than an unanswered question.
     """
 
-    annual_taxes: Decimal = D("0")
-    annual_insurance: Decimal = D("0")
-    monthly_hoa: Decimal = D("0")
-    monthly_utilities: Decimal = D("150")
+    annual_taxes: Optional[Decimal] = None
+    annual_insurance: Optional[Decimal] = None
+    monthly_hoa: Optional[Decimal] = None
+    monthly_utilities: Optional[Decimal] = None
     monthly_other: Decimal = D("0")
+
+    EXPENSE_FIELDS = ("annual_taxes", "annual_insurance", "monthly_hoa", "monthly_utilities")
+
+    def unknown_fields(self) -> List[str]:
+        """Expenses nobody has established yet, in display order."""
+        return _unknown_among(self, self.EXPENSE_FIELDS)
+
+    def blocking_unknowns(self) -> List[str]:
+        return [n for n in self.unknown_fields() if n in BLOCKING_UNKNOWN_EXPENSES]
 
     @property
     def monthly_total(self) -> Decimal:
+        """Carrying cost per month, with unknowns omitted.
+
+        Omitting them UNDERSTATES the cost. That is the honest direction to be
+        wrong in — a guessed figure would look like knowledge — but it is only
+        acceptable because ``unknown_fields()`` is reported alongside it.
+        """
         return (
-            self.annual_taxes / D("12")
-            + self.annual_insurance / D("12")
-            + self.monthly_hoa
-            + self.monthly_utilities
+            known(self.annual_taxes) / D("12")
+            + known(self.annual_insurance) / D("12")
+            + known(self.monthly_hoa)
+            + known(self.monthly_utilities)
             + self.monthly_other
         )
 
@@ -165,9 +248,10 @@ class RentalAssumptions:
     management_percent: Decimal = D("0.08")  # of collected rent
     maintenance_percent: Decimal = D("0.05")  # of gross scheduled rent
     capex_percent: Decimal = D("0.05")  # of gross scheduled rent
-    annual_taxes: Decimal = D("0")
-    annual_insurance: Decimal = D("0")
-    monthly_hoa: Decimal = D("0")
+    # Tri-state, as on HoldingCosts: a figure, an explicit 0, or unknown.
+    annual_taxes: Optional[Decimal] = None
+    annual_insurance: Optional[Decimal] = None
+    monthly_hoa: Optional[Decimal] = None
     annual_other_expenses: Decimal = D("0")
 
     minimum_monthly_cash_flow: Decimal = D("300")
@@ -175,6 +259,14 @@ class RentalAssumptions:
     target_dscr: Decimal = D("1.25")
 
     financing: FinancingTerms = field(default_factory=lambda: DEFAULT_CONVENTIONAL)
+
+    EXPENSE_FIELDS = ("annual_taxes", "annual_insurance", "monthly_hoa")
+
+    def unknown_fields(self) -> List[str]:
+        return _unknown_among(self, self.EXPENSE_FIELDS)
+
+    def blocking_unknowns(self) -> List[str]:
+        return [n for n in self.unknown_fields() if n in BLOCKING_UNKNOWN_EXPENSES]
 
 
 @dataclass(frozen=True)
@@ -230,6 +322,25 @@ class Assumptions:
     seller_finance: SellerFinanceAssumptions = field(default_factory=SellerFinanceAssumptions)
     ranking: StrategyRankingWeights = field(default_factory=StrategyRankingWeights)
 
+    # Which generation of assumption semantics this set was written under.
+    # See ASSUMPTIONS_SCHEMA_VERSION.
+    schema_version: int = ASSUMPTIONS_SCHEMA_VERSION
+
+    def unknown_expenses(self) -> Dict[str, List[str]]:
+        """Unknown operating expenses, grouped by the section they live in."""
+        return {
+            "holding": self.holding.unknown_fields(),
+            "rental": self.rental.unknown_fields(),
+        }
+
+    def blocking_unknown_expenses(self) -> List[str]:
+        """Dotted paths of the unknowns that must stop a PURSUE recommendation."""
+        return [
+            f"{section}.{name}"
+            for section, source in (("holding", self.holding), ("rental", self.rental))
+            for name in source.blocking_unknowns()
+        ]
+
     def to_dict(self) -> Dict[str, Any]:
         return _serialize(asdict(self))
 
@@ -242,7 +353,53 @@ class Assumptions:
         """
         if not data:
             return cls()
-        return _build(cls, data)
+        return _build(cls, migrate_assumptions(data))
+
+
+def migrate_assumptions(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Bring a stored assumptions blob up to the current schema version.
+
+    A blob that does not declare ``schema_version`` is treated as legacy. That
+    is deliberate: every blob written before version 1 lacks the key, and
+    reading one as current would silently turn its zeros into real figures.
+    A caller building a fresh assumption set by hand — a seed script, or an API
+    client — must therefore declare the current version. Getting that wrong
+    fails loudly (the values come back as unknown and the response says so),
+    whereas the opposite default would fail silently.
+
+    Only one migration exists so far, and it exists because the meaning of a
+    stored value changed rather than its shape. Before version 1, taxes,
+    insurance and HOA defaulted to ``0`` and that zero was how "nobody entered
+    this" was represented. Reading such a blob today would turn every legacy
+    analysis into a confident claim that the property has no tax bill — the
+    analysis would not merely be stale, it would assert something false.
+
+    So a legacy zero becomes ``None``, and utilities keep the invented ``150``
+    they were actually computed with, because the point of a stored analysis is
+    that it reproduces. A legacy blob that carried a NON-zero figure is
+    untouched: that was a real number someone entered.
+    """
+    version = int(data.get("schema_version") or 0)
+    if version >= ASSUMPTIONS_SCHEMA_VERSION:
+        return data
+
+    migrated = dict(data)
+    for section in ("holding", "rental"):
+        raw = migrated.get(section)
+        if not isinstance(raw, Mapping):
+            continue
+        block = dict(raw)
+        for name in _LEGACY_UNKNOWN_FIELDS:
+            if name in block and block[name] is not None and D(block[name]) == 0:
+                block[name] = None
+        if section == "holding":
+            block.setdefault("monthly_utilities", _LEGACY_UTILITIES_DEFAULT)
+        migrated[section] = block
+    # A legacy blob that omitted a section entirely still needs the utilities
+    # figure it was computed with.
+    migrated.setdefault("holding", {"monthly_utilities": _LEGACY_UTILITIES_DEFAULT})
+    migrated["schema_version"] = ASSUMPTIONS_SCHEMA_VERSION
+    return migrated
 
 
 def _serialize(value: Any) -> Any:
@@ -275,7 +432,9 @@ def _build(cls: type, data: Mapping[str, Any]) -> Any:
         ftype = hints.get(f.name, Any)
 
         if get_origin(ftype) is Union:  # Optional[X]
-            if raw is None:
+            # "" is what an emptied form field sends. It means the user cleared
+            # the value, which is unknown — not zero.
+            if raw is None or raw == "":
                 kwargs[f.name] = None
                 continue
             candidates = [t for t in get_args(ftype) if t is not type(None)]

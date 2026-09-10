@@ -39,7 +39,12 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `${PYTHON} -m uvicorn atlas_api.main:app --port ${API_PORT} --app-dir ../api`,
+      // The database file is deleted first, not merely reused. Atlas has no
+      // migration runner yet, so create_all() adds tables but never alters an
+      // existing one: a schema change plus a leftover file from the previous
+      // run fails deep inside a query with "no such column", which reads like
+      // a code bug rather than a stale fixture.
+      command: `rm -f ./atlas-e2e.db && ${PYTHON} -m uvicorn atlas_api.main:app --port ${API_PORT} --app-dir ../api`,
       port: API_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,

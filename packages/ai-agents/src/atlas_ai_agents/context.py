@@ -133,8 +133,16 @@ MISSING_FIELD_LABELS = {
     "arv": "After-repair value supported by comparable sales",
     "rehab": "Rehab estimate from a scope of work or contractor bid",
     "monthly_rent": "Market rent estimate",
-    "annual_taxes": "Annual property tax bill",
-    "annual_insurance": "Annual insurance premium",
+    # Expenses are reported with the section they belong to, because the
+    # holding-period figure and the rental-period figure are edited separately
+    # and can legitimately differ (a vacant rehab is not insured as a rental).
+    "holding.annual_taxes": "Annual property tax bill (holding period)",
+    "holding.annual_insurance": "Annual insurance premium (holding period)",
+    "holding.monthly_hoa": "Monthly HOA dues while held (0 if none)",
+    "holding.monthly_utilities": "Monthly utilities while held (0 if none)",
+    "rental.annual_taxes": "Annual property tax bill",
+    "rental.annual_insurance": "Annual insurance premium",
+    "rental.monthly_hoa": "Monthly HOA dues (0 if none)",
 }
 
 

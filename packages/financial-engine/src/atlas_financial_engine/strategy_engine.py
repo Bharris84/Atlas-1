@@ -12,7 +12,7 @@ normalisation would make the best of five bad options look excellent.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -326,6 +326,56 @@ def _build_rationale(
     return lines
 
 
+# Ceiling applied to any strategy computed without a real tax or insurance
+# figure. HIGH means "this number is well supported"; a cash flow missing an
+# expense every property has cannot be that, however good the comps are.
+UNKNOWN_EXPENSE_CONFIDENCE_CEILING = Confidence.MEDIUM
+
+
+def _cap_for_unknown_expenses(
+    results: Dict[Strategy, StrategyResult], inputs: DealInputs
+) -> Dict[Strategy, StrategyResult]:
+    """Downgrade every viable strategy computed on incomplete expenses.
+
+    Applied here rather than in each strategy module because the omission is a
+    property of the inputs, not of any one exit: taxes and insurance are paid
+    whether the property is flipped, held or wholesaled to someone who will
+    hold it. Doing it once also means a strategy added later inherits it.
+    """
+    blocking = inputs.assumptions.blocking_unknown_expenses()
+    if not blocking:
+        return results
+
+    reason = (
+        "Confidence capped at MEDIUM: "
+        + ", ".join(_EXPENSE_LABELS.get(path, path) for path in blocking)
+        + " not established, so this figure omits an expense the property "
+        "certainly incurs."
+    )
+    capped: Dict[Strategy, StrategyResult] = {}
+    for strategy, result in results.items():
+        if not result.viable:
+            capped[strategy] = result
+            continue
+        capped[strategy] = replace(
+            result,
+            confidence=Confidence.weakest(
+                result.confidence, UNKNOWN_EXPENSE_CONFIDENCE_CEILING
+            ),
+            confidence_reasons=list(result.confidence_reasons) + [reason],
+            missing_inputs=sorted(set(list(result.missing_inputs) + blocking)),
+        )
+    return capped
+
+
+_EXPENSE_LABELS = {
+    "holding.annual_taxes": "holding-period property taxes",
+    "holding.annual_insurance": "holding-period insurance",
+    "rental.annual_taxes": "property taxes",
+    "rental.annual_insurance": "insurance",
+}
+
+
 def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
     """Run every strategy model and rank the viable ones."""
     results: Dict[Strategy, StrategyResult] = {
@@ -335,6 +385,7 @@ def analyze_all_strategies(inputs: DealInputs) -> StrategyComparison:
         Strategy.BRRRR: analyze_brrrr(inputs),
         Strategy.SELLER_FINANCE: analyze_seller_finance(inputs),
     }
+    results = _cap_for_unknown_expenses(results, inputs)
 
     # Computed BEFORE scoring, and passed into it. The ranking and the figure
     # shown to the user are then the same number by construction, not by two

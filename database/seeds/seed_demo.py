@@ -18,6 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "apps" / "api"))
 
+from atlas_financial_engine import ASSUMPTIONS_SCHEMA_VERSION  # noqa: E402
+
 from atlas_api.auth import CurrentUser  # noqa: E402
 from atlas_api.config import get_settings  # noqa: E402
 from atlas_api.db import SessionLocal, init_db  # noqa: E402
@@ -60,9 +62,22 @@ DEMO_PROPERTIES = [
                 "title_reviewed": True,
                 "inspection_completed": True,
             },
+            # schema_version is declared explicitly: an assumptions blob
+            # without it is read with pre-tri-state semantics, where a 0 for
+            # taxes or insurance meant "unfilled" rather than "none".
             "assumptions": {
-                "rental": {"annual_taxes": "2400", "annual_insurance": "1800"},
-                "holding": {"annual_taxes": "2400", "annual_insurance": "1800"},
+                "schema_version": ASSUMPTIONS_SCHEMA_VERSION,
+                "rental": {
+                    "annual_taxes": "2400",
+                    "annual_insurance": "1800",
+                    "monthly_hoa": "0",
+                },
+                "holding": {
+                    "annual_taxes": "2400",
+                    "annual_insurance": "1800",
+                    "monthly_hoa": "0",
+                    "monthly_utilities": "150",
+                },
             },
         },
         "lead_type": "long_DOM",
@@ -90,6 +105,8 @@ DEMO_PROPERTIES = [
             "rehab": "38000",
             "monthly_rent": "1650",
             "evidence": {"arv_basis": "automated_valuation", "rehab_basis": "per_sqft_estimate"},
+            # No assumptions at all: this property demonstrates the unknown
+            # operating expense flag alongside the thin valuation evidence.
         },
         "lead_type": "absentee",
         "comps": [],
@@ -120,8 +137,18 @@ DEMO_PROPERTIES = [
                 "property_visited": True,
             },
             "assumptions": {
-                "rental": {"annual_taxes": "1100", "annual_insurance": "1400"},
-                "holding": {"annual_taxes": "1100", "annual_insurance": "1400"},
+                "schema_version": ASSUMPTIONS_SCHEMA_VERSION,
+                "rental": {
+                    "annual_taxes": "1100",
+                    "annual_insurance": "1400",
+                    "monthly_hoa": "0",
+                },
+                "holding": {
+                    "annual_taxes": "1100",
+                    "annual_insurance": "1400",
+                    "monthly_hoa": "0",
+                    "monthly_utilities": "120",
+                },
             },
         },
         "lead_type": "vacant",

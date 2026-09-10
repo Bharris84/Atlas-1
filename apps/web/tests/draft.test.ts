@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EMPTY_DRAFT, draftHasInput, draftToRequest, type Draft } from "@/hooks/useAnalysis";
+import { ASSUMPTIONS_SCHEMA_VERSION } from "@/lib/assumptions";
 
 function draft(overrides: Partial<Draft> = {}): Draft {
   return { ...EMPTY_DRAFT, ...overrides };
@@ -42,7 +43,23 @@ describe("draftToRequest", () => {
         assumptions: { flip: { rehab_contingency: "0.25" } },
       })
     );
-    expect(request.assumptions).toEqual({ flip: { rehab_contingency: "0.25" } });
+    expect(request.assumptions).toEqual({
+      flip: { rehab_contingency: "0.25" },
+      schema_version: ASSUMPTIONS_SCHEMA_VERSION,
+    });
+  });
+
+  it("declares the assumption schema version alongside the values", () => {
+    // Without it the API reads the payload with pre-tri-state semantics, where
+    // a 0 for taxes or insurance meant "not entered" — so a user's deliberate
+    // zero would come back as unknown.
+    const request = draftToRequest(
+      draft({
+        purchase_price: "150000",
+        assumptions: { rental: { annual_taxes: "0" } },
+      })
+    );
+    expect(request.assumptions?.schema_version).toBe(ASSUMPTIONS_SCHEMA_VERSION);
   });
 
   it("omits evidence and risk flags when empty", () => {

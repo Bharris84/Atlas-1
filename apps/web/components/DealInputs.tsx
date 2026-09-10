@@ -1,6 +1,6 @@
 "use client";
 
-import { ProvisionalTag } from "@/components/Badges";
+import { ProvisionalTag, UnknownTag } from "@/components/Badges";
 import {
   ASSUMPTION_GROUPS,
   toDisplayValue,
@@ -211,6 +211,12 @@ export function RiskFlagPanel({ state }: { state: UseAnalysisResult }) {
  * An untouched field shows the engine's provisional default and is tagged as
  * such. Clearing an edited field returns it to that default rather than
  * sending an empty override.
+ *
+ * Operating expenses are the exception: they have no default, so a blank one
+ * is unknown rather than defaulted, and clearing it is a real answer ("I don't
+ * know"). Those fields are tagged and coloured differently, because an empty
+ * box tagged "default" would tell the user Atlas had picked a number when it
+ * had picked nothing and left the expense out of the arithmetic.
  */
 export function AssumptionsPanel({
   state,
@@ -251,13 +257,19 @@ export function AssumptionsPanel({
             <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.fields.map((field) => {
                 const overridden = isOverridden(field.path);
+                const value = currentValue(field);
+                // Three states, not two. Blank on an expense field means
+                // nobody has established it — which is why it gets its own
+                // tag rather than the "default" one: there is no default.
+                const unknown = field.unknownable === true && value === "";
                 return (
                   <div key={field.path}>
                     <label className="label flex items-center gap-1">
                       <span title={field.help} className={field.help ? "cursor-help" : ""}>
                         {field.label}
                       </span>
-                      {!overridden && <ProvisionalTag />}
+                      {unknown && <UnknownTag />}
+                      {!unknown && !overridden && <ProvisionalTag />}
                       {overridden && (
                         <button
                           type="button"
@@ -271,10 +283,15 @@ export function AssumptionsPanel({
                     <div className="relative mt-1">
                       <input
                         className={`input tabular pr-8 ${
-                          overridden ? "border-ink-500 bg-ink-50" : ""
+                          unknown
+                            ? "border-caution-500/50 bg-caution-50"
+                            : overridden
+                              ? "border-ink-500 bg-ink-50"
+                              : ""
                         }`}
                         inputMode="decimal"
-                        value={currentValue(field)}
+                        value={value}
+                        placeholder={unknown ? "not known" : undefined}
                         onChange={(event) =>
                           setAssumption(field.path, event.target.value, field.kind)
                         }
@@ -284,6 +301,11 @@ export function AssumptionsPanel({
                         {unitSuffix(field.kind)}
                       </span>
                     </div>
+                    {unknown && (
+                      <p className="mt-1 text-[11px] leading-snug text-caution-700">
+                        Omitted from the result. Enter 0 if it does not apply.
+                      </p>
+                    )}
                   </div>
                 );
               })}

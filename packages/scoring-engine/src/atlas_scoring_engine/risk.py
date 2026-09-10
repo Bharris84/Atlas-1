@@ -131,6 +131,15 @@ DECLARABLE_FLAGS: Dict[str, RiskFlag] = {
 HEAVY_REHAB_RATIO = D("0.30")
 OLD_CONSTRUCTION_YEAR = 1960
 
+# Human-readable names for the dotted assumption paths reported by
+# Assumptions.blocking_unknown_expenses().
+_EXPENSE_LABELS = {
+    "holding.annual_taxes": "holding-period property taxes",
+    "holding.annual_insurance": "holding-period insurance",
+    "rental.annual_taxes": "property taxes",
+    "rental.annual_insurance": "insurance",
+}
+
 
 def derive_risk_flags(
     inputs: DealInputs, comparison: StrategyComparison
@@ -214,6 +223,34 @@ def derive_risk_flags(
                     ),
                 )
             )
+
+    # --- Operating expenses -------------------------------------------------
+    #
+    # Unknown taxes or insurance are treated as a deal-stopper rather than a
+    # warning. On a typical single-family rental the two together run several
+    # hundred dollars a month; leaving them out flips cash flow positive and
+    # moves a deal from NOT MET to MET inside the buy box. A number that can
+    # change the verdict on its own cannot be an advisory note.
+    blocking_expenses = inputs.assumptions.blocking_unknown_expenses()
+    if blocking_expenses:
+        labels = ", ".join(
+            _EXPENSE_LABELS.get(path, path) for path in blocking_expenses
+        )
+        flags.append(
+            RiskFlag(
+                code="operating_expenses_unknown",
+                label="Operating expenses not established",
+                severity=RiskSeverity.CRITICAL,
+                detail=(
+                    f"No figure has been entered for {labels}. Atlas leaves unknown "
+                    "expenses out of the arithmetic rather than guessing, so every "
+                    "cash-flow and profit figure above is overstated. Enter the real "
+                    "numbers — or an explicit 0 where the expense does not apply — "
+                    "before treating this analysis as decision-grade."
+                ),
+                blocks_pursue=True,
+            )
+        )
 
     if not inputs.evidence.property_visited:
         flags.append(

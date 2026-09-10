@@ -88,6 +88,24 @@ export function StatusPill({ status }: { status: string }) {
 }
 
 /**
+ * An expense nobody has established yet.
+ *
+ * Deliberately distinct from `default`: a provisional default is a number
+ * Atlas chose, whereas this is no number at all. The result was computed
+ * without it, so it reads better than the property really is.
+ */
+export function UnknownTag() {
+  return (
+    <span
+      className="ml-1 cursor-help rounded bg-caution-50 px-1 text-[10px] font-medium text-caution-700 ring-1 ring-inset ring-caution-500/40"
+      title="Not known. Left out of the arithmetic rather than guessed, so the result is overstated. Enter 0 if this expense does not apply."
+    >
+      not known
+    </span>
+  );
+}
+
+/**
  * Marks a value that came from Atlas's provisional defaults rather than from
  * anything specific to this property.
  */

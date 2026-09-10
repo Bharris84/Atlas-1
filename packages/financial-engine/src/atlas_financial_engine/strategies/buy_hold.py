@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from ..assumptions import Assumptions, RentalAssumptions
+from ..assumptions import Assumptions, RentalAssumptions, known
 from ..confidence import assess_arv, assess_rent
 from ..enums import Confidence, Strategy
 from ..inputs import DealInputs
@@ -61,9 +61,11 @@ def build_operating_statement(
     management = egi * rental.management_percent
     maintenance = gsr * rental.maintenance_percent
     capex = gsr * rental.capex_percent
-    taxes = rental.annual_taxes
-    insurance = rental.annual_insurance
-    hoa = rental.monthly_hoa * MONTHS_PER_YEAR
+    # Unknown expenses are omitted, not guessed. That overstates NOI, which is
+    # why analyze_buy_hold reports them and the risk engine blocks on them.
+    taxes = known(rental.annual_taxes)
+    insurance = known(rental.annual_insurance)
+    hoa = known(rental.monthly_hoa) * MONTHS_PER_YEAR
     other = rental.annual_other_expenses
     opex = management + maintenance + capex + taxes + insurance + hoa + other
     noi = egi - opex
@@ -199,15 +201,22 @@ def analyze_buy_hold(inputs: DealInputs) -> StrategyResult:
         warnings.append(
             "Negative cash flow: this rental requires ongoing capital to hold."
         )
-    if rental.annual_taxes == 0:
+    unknown_expenses = rental.unknown_fields()
+    if "annual_taxes" in unknown_expenses:
         warnings.append(
-            "Property taxes are set to zero. Until a real tax figure is entered "
-            "this NOI is overstated."
+            "Property taxes are not known and have been left out of this NOI. "
+            "Every US property is taxed, so the cash flow above is overstated "
+            "until a real figure is entered."
         )
-    if rental.annual_insurance == 0:
+    if "annual_insurance" in unknown_expenses:
         warnings.append(
-            "Insurance is set to zero. Coastal and older-home premiums can change "
-            "this analysis materially."
+            "Insurance is not known and has been left out of this NOI. Coastal "
+            "and older-home premiums can change this analysis materially."
+        )
+    if "monthly_hoa" in unknown_expenses:
+        warnings.append(
+            "HOA dues are not known. Enter 0 if the property has no association, "
+            "so this stops being reported as an open question."
         )
     if ratio_dscr is not None and ratio_dscr < D("1.0"):
         warnings.append(

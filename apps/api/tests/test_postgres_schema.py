@@ -49,7 +49,11 @@ def migrated_db():
     url = POSTGRES_URL.rsplit("/", 1)[0] + f"/{name}"
     try:
         with psycopg.connect(url, autocommit=True) as conn:
-            for migration in ("0001_initial_schema.sql", "0003_investor_profile.sql"):
+            for migration in (
+                "0001_initial_schema.sql",
+                "0003_investor_profile.sql",
+                "0004_assumptions_schema_version.sql",
+            ):
                 conn.execute((MIGRATIONS / migration).read_text())
         yield url
     finally:
@@ -113,6 +117,41 @@ class TestMigrationApplies:
         with psycopg.connect(migrated_db, autocommit=True) as conn:
             conn.execute(sql)
             conn.execute(sql)
+
+
+    def test_the_schema_version_migration_is_idempotent(self, migrated_db):
+        sql = (MIGRATIONS / "0004_assumptions_schema_version.sql").read_text()
+        with psycopg.connect(migrated_db, autocommit=True) as conn:
+            conn.execute(sql)
+            conn.execute(sql)
+
+    def test_an_existing_analysis_defaults_to_the_legacy_schema_version(
+        self, migrated_db
+    ):
+        """The whole point of the column: rows written before the tri-state
+        change must read back as legacy, so their stored zeros are understood
+        as "unfilled" rather than as a property with no tax bill."""
+        with psycopg.connect(migrated_db, autocommit=True) as conn:
+            pid, aid = uuid.uuid4(), uuid.uuid4()
+            conn.execute(
+                "INSERT INTO properties (id, owner_id, address, property_status,"
+                " created_at, updated_at) VALUES (%s,%s,'4 Test St','prospect',"
+                "now(),now())",
+                (pid, uuid.uuid4()),
+            )
+            # Written the way a pre-0004 INSERT would have been: no mention of
+            # the new column at all.
+            conn.execute(
+                "INSERT INTO deal_analyses (id, property_id, owner_id,"
+                " requires_human_review, created_at, updated_at)"
+                " VALUES (%s,%s,%s,false,now(),now())",
+                (aid, pid, uuid.uuid4()),
+            )
+            version = conn.execute(
+                "SELECT assumptions_schema_version FROM deal_analyses WHERE id=%s",
+                (aid,),
+            ).fetchone()[0]
+        assert version == 0
 
 
 class TestMigrationMatchesTheOrm:

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ALL_ASSUMPTION_FIELDS,
+  ASSUMPTIONS_SCHEMA_VERSION,
   ASSUMPTION_GROUPS,
   deletePath,
+  describeAssumptionPath,
   getPath,
   setPath,
   toApiValue,
@@ -148,5 +150,72 @@ describe("the assumption surface", () => {
     for (const field of ALL_ASSUMPTION_FIELDS) {
       expect(field.label.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("tri-state operating expenses", () => {
+  const EXPENSES = [
+    "holding.annual_taxes",
+    "holding.annual_insurance",
+    "holding.monthly_hoa",
+    "holding.monthly_utilities",
+    "rental.annual_taxes",
+    "rental.annual_insurance",
+    "rental.monthly_hoa",
+  ];
+
+  it("marks every property-specific expense as unknownable", () => {
+    for (const path of EXPENSES) {
+      const field = ALL_ASSUMPTION_FIELDS.find((f) => f.path === path);
+      expect(field, path).toBeDefined();
+      expect(field?.unknownable, path).toBe(true);
+    }
+  });
+
+  it("marks nothing else as unknownable", () => {
+    // Everything else genuinely has a defensible default. Tagging a field
+    // "not known" when Atlas has in fact chosen a number would be the same
+    // false claim in the opposite direction.
+    const tagged = ALL_ASSUMPTION_FIELDS.filter((f) => f.unknownable).map((f) => f.path);
+    expect(tagged.sort()).toEqual([...EXPENSES].sort());
+  });
+
+  it("sends an explicit zero rather than dropping it", () => {
+    // The whole point of the tri-state: "0" must survive as a value, while a
+    // blank field clears the override and returns to unknown.
+    expect(toApiValue("0", "money")).toBe("0");
+    expect(toApiValue("", "money")).toBeNull();
+    expect(toApiValue("   ", "money")).toBeNull();
+  });
+
+  it("renders an unknown value as blank, not as zero", () => {
+    expect(toDisplayValue(null, "money")).toBe("");
+    expect(toDisplayValue(undefined, "money")).toBe("");
+    expect(toDisplayValue("0", "money")).toBe("0");
+  });
+});
+
+describe("describeAssumptionPath", () => {
+  it("names an expense with the section it belongs to", () => {
+    // holding.annual_taxes and rental.annual_taxes are separately editable and
+    // can legitimately differ, so "Annual taxes" alone would be ambiguous.
+    expect(describeAssumptionPath("holding.annual_taxes")).toBe(
+      "Annual taxes — holding costs"
+    );
+    expect(describeAssumptionPath("rental.annual_taxes")).toBe(
+      "Annual taxes — rental operating expenses"
+    );
+  });
+
+  it("returns null for a plain input so the caller can fall back", () => {
+    expect(describeAssumptionPath("purchase_price")).toBeNull();
+    expect(describeAssumptionPath("arv")).toBeNull();
+  });
+});
+
+describe("schema version", () => {
+  it("is a positive integer the API can compare against", () => {
+    expect(Number.isInteger(ASSUMPTIONS_SCHEMA_VERSION)).toBe(true);
+    expect(ASSUMPTIONS_SCHEMA_VERSION).toBeGreaterThan(0);
   });
 });

@@ -170,15 +170,55 @@ class TestWarningsAndEdges:
         assert result.monthly_cash_flow < 0
         assert any("Negative cash flow" in w for w in result.warnings)
 
-    def test_zero_taxes_are_flagged_as_an_understated_expense(self, baseline: DealInputs):
-        no_taxes = replace(
+    def test_unknown_taxes_are_flagged_as_an_understated_expense(
+        self, baseline: DealInputs
+    ):
+        unknown_taxes = replace(
             baseline,
             assumptions=replace(
                 baseline.assumptions,
-                rental=RentalAssumptions(annual_taxes=D("0"), annual_insurance=D("1800")),
+                rental=RentalAssumptions(annual_taxes=None, annual_insurance=D("1800")),
             ),
         )
-        assert any("taxes are set to zero" in w for w in analyze_buy_hold(no_taxes).warnings)
+        result = analyze_buy_hold(unknown_taxes)
+        assert any("taxes are not known" in w for w in result.warnings)
+
+    def test_an_explicit_zero_is_not_flagged(self, baseline: DealInputs):
+        """A tax-abated property is a real thing. Warning about a figure the
+        user has already answered is how a warning gets ignored."""
+        zero_taxes = replace(
+            baseline,
+            assumptions=replace(
+                baseline.assumptions,
+                rental=RentalAssumptions(
+                    annual_taxes=D("0"),
+                    annual_insurance=D("1800"),
+                    monthly_hoa=D("0"),
+                ),
+            ),
+        )
+        result = analyze_buy_hold(zero_taxes)
+        assert not any("taxes" in w.lower() for w in result.warnings)
+
+    def test_an_unknown_expense_is_omitted_rather_than_guessed(
+        self, baseline: DealInputs
+    ):
+        """Omission is the honest error direction, and it is bounded: NOI is
+        higher by exactly the missing figure, never by an invented one."""
+        known_taxes = analyze_buy_hold(baseline)
+        unknown = replace(
+            baseline,
+            assumptions=replace(
+                baseline.assumptions,
+                rental=replace(baseline.assumptions.rental, annual_taxes=None),
+            ),
+        )
+        result = analyze_buy_hold(unknown)
+        assert result.detail["operating_statement"]["taxes"] == "0.00"
+        difference = D(result.detail["operating_statement"]["net_operating_income"]) - D(
+            known_taxes.detail["operating_statement"]["net_operating_income"]
+        )
+        assert difference == baseline.assumptions.rental.annual_taxes
 
     def test_dscr_below_one_is_flagged(self, baseline: DealInputs):
         strained = replace(baseline, purchase_price=D("300000"))

@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
-import { deletePath, setPath, toApiValue, type FieldKind } from "@/lib/assumptions";
+import {
+  ASSUMPTIONS_SCHEMA_VERSION,
+  deletePath,
+  setPath,
+  toApiValue,
+  type FieldKind,
+} from "@/lib/assumptions";
 import type { AnalysisRequest, AnalysisResponse, Evidence } from "@atlas/shared-types";
 
 /**
@@ -66,7 +72,15 @@ export function draftToRequest(draft: Draft, includeAi = false): AnalysisRequest
     if (value !== null) (request as Record<string, unknown>)[field] = value;
   }
   if (Object.keys(draft.evidence).length > 0) request.evidence = draft.evidence;
-  if (Object.keys(draft.assumptions).length > 0) request.assumptions = draft.assumptions;
+  if (Object.keys(draft.assumptions).length > 0) {
+    // The version travels with the values. Without it the API reads the
+    // payload with pre-tri-state semantics and turns a deliberate 0 for taxes,
+    // insurance or HOA back into "not known".
+    request.assumptions = {
+      ...draft.assumptions,
+      schema_version: ASSUMPTIONS_SCHEMA_VERSION,
+    };
+  }
   if (draft.risk_flags.length > 0) request.risk_flags = draft.risk_flags;
   return request;
 }
