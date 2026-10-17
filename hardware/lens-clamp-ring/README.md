@@ -1,0 +1,30 @@
+# Lens clamp ring with shoe / 1/4"-20 mount
+
+`lens_clamp_ring.scad` is a parametric, two-piece ring that bolts around a lens barrel. It carries one of these mounts on top:
+
+| `mount_type` | What you get |
+|---|---|
+| `shoe` | ISO 518 cold/hot-shoe slot (accepts a standard shoe foot) |
+| `quarter20` | Flat pad with a 1/4"-20 mount |
+| `both` | Shoe slot with a 1/4"-20 hole in its floor |
+
+For the 1/4"-20 mount, `quarter20_style` picks how the thread is made:
+
+- `insert`: a 1/4"-20 heat-set insert (check `insert_hole_d` against your insert's datasheet).
+- `nut`: a captive 1/4"-20 hex nut that slides in from the back face.
+- `tap`: a #7 (5.1 mm) pilot hole that you tap yourself.
+
+## Usage
+
+1. Use calipers to measure the barrel where the ring will sit. Pick a spot that doesn't rotate, never the zoom or focus ring. Set `lens_d` to that measurement. The presets are Canon's maximum diameters, so treat them only as a starting point.
+2. Open the file in OpenSCAD and use the Customizer to set the mount type and style. Then set `part = "plate"` and export an STL.
+3. Print in PETG, ASA or ABS, with 4+ perimeters and 30–40% infill. Print both halves split-face down; the plate layout already does this.
+4. Line the bore with 1 mm felt or rubber tape. Then bolt the halves together with 2× M4×16 socket-head screws and nuts. The `clamp_gap` setting makes the halves squeeze the liner as you tighten.
+
+From the command line:
+
+```sh
+openscad -o ring.stl -D 'part="plate"' -D 'lens_d=88.5' -D 'mount_type="both"' lens_clamp_ring.scad
+```
+
+**Load warning:** a lens barrel isn't built to carry weight. Use this ring for light loads, such as a phone or tablet teleprompter. A full-size teleprompter should sit on 15 mm rods or a rail, not on the lens.
