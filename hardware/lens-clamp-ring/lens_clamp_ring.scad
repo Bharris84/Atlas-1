@@ -29,7 +29,7 @@ part = "assembly"; // [assembly, top, bottom, plate, fit_test]
 
 /* [Lens] */
 // Pick a preset or "custom" and set lens_d yourself
-lens_preset = "custom"; // [custom, EF 24 f/2.8 IS USM, EF 24 f/1.4L II, EF 24-70 f/2.8L II, EF 70-200 f/2.8L IS II/III, EF 24-105 f/4L IS, RF 24-70 f/2.8L IS, RF 24-105 f/4L IS, EF 50 f/1.8 STM]
+lens_preset = "EF 24 f/2.8 IS USM"; // [custom, EF 24 f/2.8 IS USM, EF 24 f/1.4L II, EF 24-70 f/2.8L II, EF 70-200 f/2.8L IS II/III, EF 24-105 f/4L IS, RF 24-70 f/2.8L IS, RF 24-105 f/4L IS, EF 50 f/1.8 STM]
 // Measured barrel diameter at the clamp location (mm)
 lens_d = 83.5;
 // Liner thickness inside the bore (felt / rubber / TPU). 0 = bare plastic
