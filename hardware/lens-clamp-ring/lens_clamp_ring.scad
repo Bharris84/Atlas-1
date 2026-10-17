@@ -23,12 +23,13 @@
 // a 1/4"-20 hex nut, or tap the hole directly (see quarter20_style).
 
 /* [What to render] */
-// assembly = preview with both halves; plate = both halves laid out for printing
-part = "assembly"; // [assembly, top, bottom, plate]
+// assembly = preview with both halves; plate = both halves laid out for printing;
+// fit_test = thin, mount-less slice of both halves to check the bore size fast
+part = "assembly"; // [assembly, top, bottom, plate, fit_test]
 
 /* [Lens] */
 // Pick a preset or "custom" and set lens_d yourself
-lens_preset = "custom"; // [custom, EF 24-70 f/2.8L II, EF 70-200 f/2.8L IS II/III, EF 24-105 f/4L IS, RF 24-70 f/2.8L IS, RF 24-105 f/4L IS, EF 50 f/1.8 STM]
+lens_preset = "custom"; // [custom, EF 24 f/2.8 IS USM, EF 24 f/1.4L II, EF 24-70 f/2.8L II, EF 70-200 f/2.8L IS II/III, EF 24-105 f/4L IS, RF 24-70 f/2.8L IS, RF 24-105 f/4L IS, EF 50 f/1.8 STM]
 // Measured barrel diameter at the clamp location (mm)
 lens_d = 83.5;
 // Liner thickness inside the bore (felt / rubber / TPU). 0 = bare plastic
@@ -48,6 +49,14 @@ ear_t = 8;
 ear_len = 12;
 // Fillet radius where ears / mount meet the ring
 fillet = 3;
+// Width of the fit_test slice
+fit_test_w = 10;
+
+/* [Cable tie] */
+// Tab with a zip-tie slot on the +X ear to anchor the monitor's power cord
+cable_tie = true;
+tie_tab = 7;
+tie_slot = [2.2, 5];  // fits ties up to ~4.5 mm wide
 
 /* [Clamp hardware] */
 bolt_clear_d = 4.5;   // M4 clearance
@@ -71,7 +80,7 @@ shoe_foot_t = 2.0;
 // Width of the opening between the rails (foot neck must pass through)
 shoe_open_w = 12.6;
 // Thickness of the retaining rails over the channel
-shoe_rail_t = 2.0;
+shoe_rail_t = 2.5;
 // Depth of the channel along the lens axis; the rest is an end stop
 shoe_depth = 18;
 
@@ -94,6 +103,8 @@ $fn = 128;
 eps = 0.01;
 
 preset_d =
+    lens_preset == "EF 24 f/2.8 IS USM"          ? 68.4 :
+    lens_preset == "EF 24 f/1.4L II"             ? 93.5 :
     lens_preset == "EF 24-70 f/2.8L II"          ? 88.5 :
     lens_preset == "EF 70-200 f/2.8L IS II/III"  ? 88.8 :
     lens_preset == "EF 24-105 f/4L IS"           ? 83.5 :
@@ -102,12 +113,17 @@ preset_d =
     lens_preset == "EF 50 f/1.8 STM"             ? 69.2 :
     lens_d;
 
+fit_test = part == "fit_test";
+// Effective axial width
+w = fit_test ? fit_test_w : ring_w;
+
 inner_r = preset_d / 2 + liner_t;
 outer_r = inner_r + wall;
 bolt_x = outer_r + ear_len / 2;
 
-has_shoe = mount_type == "shoe" || mount_type == "both";
-has_q20  = mount_type == "quarter20" || mount_type == "both";
+has_shoe = !fit_test && (mount_type == "shoe" || mount_type == "both");
+has_q20  = !fit_test && (mount_type == "quarter20" || mount_type == "both");
+has_tie  = !fit_test && cable_tie;
 
 shoe_ch_w = shoe_foot_w + shoe_tol;
 shoe_ch_h = shoe_foot_t + shoe_tol;
@@ -125,9 +141,9 @@ mount_top = max(outer_r + 3, inner_r + bore_skin + q20_depth + shoe_stack);
 // Surface the 1/4"-20 feature starts from (shoe floor, or block top)
 q20_face = mount_top - shoe_stack;
 // Axial position of the 1/4"-20 feature (centred in the shoe channel if any)
-q20_y = has_shoe ? -ring_w / 2 + shoe_depth / 2 : 0;
+q20_y = has_shoe ? -w / 2 + shoe_depth / 2 : 0;
 
-assert(!has_shoe || ring_w >= shoe_depth + 2,
+assert(!has_shoe || w >= shoe_depth + 2,
        "ring_w must be at least shoe_depth + 2 to leave an end stop");
 assert(!has_shoe || mount_w >= shoe_ch_w + 4,
        "mount_w too narrow for the shoe channel walls");
@@ -142,10 +158,11 @@ module outline_2d() {
         // clamp ears
         for (s = [-1, 1])
             translate([s > 0 ? outer_r - wall / 2 : -(outer_r + ear_len), -ear_t])
-                square([ear_len + wall / 2, 2 * ear_t]);
+                square([ear_len + wall / 2 + (s > 0 && has_tie ? tie_tab : 0), 2 * ear_t]);
         // mount block
-        translate([-mount_w / 2, outer_r * 0.5])
-            square([mount_w, mount_top - outer_r * 0.5]);
+        if (!fit_test)
+            translate([-mount_w / 2, outer_r * 0.5])
+                square([mount_w, mount_top - outer_r * 0.5]);
     }
 }
 
@@ -171,7 +188,7 @@ module clamp_bolts() {
 }
 
 module shoe_slot() {
-    y0 = -ring_w / 2 - 1;           // open at the -Y end
+    y0 = -w / 2 - 1;           // open at the -Y end
     len = shoe_depth + 1;
     ch_z = mount_top - shoe_rail_t - shoe_ch_h;
     // channel for the foot
@@ -179,7 +196,7 @@ module shoe_slot() {
     // opening between the rails
     translate([-shoe_open_w / 2, y0, ch_z]) cube([shoe_open_w, len, shoe_stack + 1]);
     // lead-in chamfer on the open end of the rails
-    translate([0, -ring_w / 2, mount_top])
+    translate([0, -w / 2, mount_top])
         rotate([-90, 0, 0])
             linear_extrude(height = 1.5, scale = [shoe_open_w / (shoe_open_w + 3), 1])
                 square([shoe_open_w + 3, 2 * shoe_rail_t + 0.2], center = true);
@@ -197,7 +214,7 @@ module quarter20() {
             // nut pocket with a slot to slide it in from the -Y face
             translate([0, 0, -q_nut_cover - q_nut_t]) {
                 rotate([0, 0, 30]) cylinder(d = q_nut_af / cos(30), h = q_nut_t, $fn = 6);
-                translate([-q_nut_af / 2, -ring_w, 0]) cube([q_nut_af, ring_w, q_nut_t]);
+                translate([-q_nut_af / 2, -w, 0]) cube([q_nut_af, w, q_nut_t]);
             }
         } else {
             translate([0, 0, -tap_depth]) cylinder(d = tap_d, h = tap_depth + eps);
@@ -207,8 +224,11 @@ module quarter20() {
 
 module full_ring() {
     difference() {
-        rotate([90, 0, 0]) linear_extrude(height = ring_w, center = true) profile_2d();
+        rotate([90, 0, 0]) linear_extrude(height = w, center = true) profile_2d();
         clamp_bolts();
+        if (has_tie)
+            translate([outer_r + ear_len + tie_tab / 2, 0, 0])
+                cube([tie_slot[0], tie_slot[1], 4 * ear_t], center = true);
         if (has_shoe) shoe_slot();
         if (has_q20) quarter20();
     }
@@ -238,20 +258,20 @@ module bottom_half() {
 module plate() {
     // both halves split-face down
     top_half();
-    translate([0, -(ring_w + 10), 0]) rotate([180, 0, 0]) bottom_half();
+    translate([0, -(w + 10), 0]) rotate([180, 0, 0]) bottom_half();
 }
 
 if (part == "assembly") {
     color("DimGray") top_half();
     color("SlateGray") translate([0, 0, -3]) bottom_half();
     // ghost of the lens
-    %rotate([90, 0, 0]) cylinder(d = preset_d, h = ring_w + 30, center = true);
+    %rotate([90, 0, 0]) cylinder(d = preset_d, h = w + 30, center = true);
 } else if (part == "top") {
     top_half();
 } else if (part == "bottom") {
     rotate([180, 0, 0]) bottom_half();
 } else {
-    plate();
+    plate();  // plate and fit_test
 }
 
 echo(str("Bore diameter (with liner) = ", 2 * inner_r, " mm, lens = ", preset_d, " mm"));
