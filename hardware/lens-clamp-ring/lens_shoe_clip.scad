@@ -17,6 +17,14 @@
 // PLA is fine for a light monitor; PETG is more forgiving if it gets snapped
 // on and off a lot. Line the bore with ~1 mm rubber tape so it grips.
 
+/* [What to render] */
+// clip = the part; size_test = four thin C-rings with different bores, to
+// find the snug fit fast (1 to 4 notches on the outside = smallest to largest)
+part = "clip"; // [clip, size_test]
+// Bores tried by size_test: size_test_start, +step, +2*step, +3*step
+size_test_start = 67.0;
+size_test_step = 0.5;
+
 /* [Lens] */
 // Diameter of the fixed barrel where the clip sits (measure it)
 lens_d = 68.2;
@@ -24,6 +32,9 @@ lens_d = 68.2;
 liner_t = 1.0;
 // How much smaller the bore is than lens + liner, so the clip squeezes
 grip = 0.3;
+// Set this to override the bore diameter directly (e.g. the size that fit
+// best in size_test); 0 = lens_d + 2 * liner_t - 2 * grip
+bore_d = 0;
 
 /* [Clip] */
 // Width of the band that grips the barrel; must fit between the mount and
@@ -58,7 +69,7 @@ $fn = 160;
 eps = 0.01;
 
 lens_r = lens_d / 2;
-inner_r = lens_r + liner_t - grip;
+inner_r = bore_d > 0 ? bore_d / 2 : lens_r + liner_t - grip;
 outer_r = inner_r + wall;
 
 ch_w = shoe_foot_w + shoe_tol;
@@ -73,7 +84,7 @@ assert(platform_w >= ch_w + 4, "platform_w too narrow for the shoe channel");
 assert(platform_len - shoe_stop >= 15, "platform too short for a shoe foot");
 
 // 2D C profile, opening centred on -Z (2D Y here is Z in the part)
-module c_profile() {
+module c_profile(inner_r = inner_r, outer_r = outer_r) {
     gap = 360 - wrap;
     tip_r = wall / 2;
     mid_r = (inner_r + outer_r) / 2;
@@ -128,9 +139,28 @@ module clip() {
     }
 }
 
-clip();
-// ghost of the lens barrel
-%rotate([-90, 0, 0]) translate([0, 0, -5]) cylinder(d = lens_d, h = platform_len + 10);
+// Thin test ring with n notches on the outside of its crown
+module test_ring(bore, n) {
+    difference() {
+        linear_extrude(height = 4) c_profile(bore / 2, bore / 2 + wall);
+        for (i = [0 : n - 1])
+            rotate(90 + (i - (n - 1) / 2) * 6)
+                translate([bore / 2 + wall, 0, -1]) cylinder(r = 1, h = 6, $fn = 16);
+    }
+}
+
+if (part == "size_test") {
+    pitch = size_test_start + size_test_step * 3 + 2 * wall + 6;
+    for (i = [0 : 3])
+        translate([(i % 2) * pitch, floor(i / 2) * pitch, 0])
+            test_ring(size_test_start + i * size_test_step, i + 1);
+    for (i = [0 : 3])
+        echo(str(i + 1, " notch(es): bore ", size_test_start + i * size_test_step, " mm"));
+} else {
+    clip();
+    // ghost of the lens barrel
+    %rotate([-90, 0, 0]) translate([0, 0, -5]) cylinder(d = lens_d, h = platform_len + 10);
+}
 
 echo(str("Bore = ", 2 * inner_r, " mm (lens ", lens_d, " + liner, minus grip)"));
 echo(str("Snap opening = ", 2 * inner_r * sin((360 - wrap) / 2), " mm"));
