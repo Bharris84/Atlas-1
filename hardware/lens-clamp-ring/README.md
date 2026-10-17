@@ -31,3 +31,13 @@ openscad -o ring.stl -D 'part="plate"' -D 'lens_d=88.5' -D 'mount_type="both"' l
 ```
 
 **Load warning:** a lens barrel isn't built to carry weight. Use this ring for light loads, such as a phone or tablet teleprompter. A full-size teleprompter should sit on 15 mm rods or a rail, not on the lens.
+
+## Snap-on shoe clip (short / pancake lenses)
+
+`lens_shoe_clip.scad` is a screwless alternative for lenses with only a narrow band of fixed barrel, such as the EF-S 24mm f/2.8 STM. It's a C-clip that wraps 220° around the barrel and snaps on. A shoe platform on top reaches forward over the focus ring without touching it. The shoe slot opens toward the front of the lens, so the foot slides in from the front.
+
+- Set `lens_d` to the barrel diameter. Set `band_w` to the clear length between the mount and the focus ring, minus about 1 mm.
+- Print it standing on its rear face, the side that goes against the camera. No supports are needed.
+- Line the bore with about 1 mm of rubber tape so it grips.
+
+`stl/efs24_stm_shoe_clip.stl` is ready to print for the EF-S 24mm f/2.8 STM, with an 8 mm band.
