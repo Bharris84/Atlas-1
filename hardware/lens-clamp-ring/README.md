@@ -41,4 +41,4 @@ openscad -o ring.stl -D 'part="plate"' -D 'lens_d=88.5' -D 'mount_type="both"' l
 - Line the bore with about 1 mm of rubber tape so it grips.
 - If the fit is off, print `part = "size_test"` (`stl/efs24_stm_size_test.stl`). It's four thin C-rings with bores of 67.0, 67.5, 68.0 and 68.5 mm, marked with 1 to 4 notches. Set `bore_d` to the one that snaps on snugly, then print the clip.
 
-`stl/efs24_stm_shoe_clip.stl` is ready to print for the EF-S 24mm f/2.8 STM, with an 8 mm band.
+`stl/efs24_stm_shoe_clip.stl` is ready to print for the EF-S 24mm f/2.8 STM. It has an 8 mm band and a 66.75 mm bore for a bare-plastic fit, with no liner needed.

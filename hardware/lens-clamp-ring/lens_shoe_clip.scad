@@ -33,8 +33,9 @@ liner_t = 1.0;
 // How much smaller the bore is than lens + liner, so the clip squeezes
 grip = 0.3;
 // Set this to override the bore diameter directly (e.g. the size that fit
-// best in size_test); 0 = lens_d + 2 * liner_t - 2 * grip
-bore_d = 0;
+// best in size_test); 0 = lens_d + 2 * liner_t - 2 * grip.
+// 66.75 = bare-PLA snug fit on the EF-S 24mm f/2.8 STM (67.0 test ring fit, tightened a touch)
+bore_d = 66.75;
 
 /* [Clip] */
 // Width of the band that grips the barrel; must fit between the mount and
@@ -162,6 +163,7 @@ if (part == "size_test") {
     %rotate([-90, 0, 0]) translate([0, 0, -5]) cylinder(d = lens_d, h = platform_len + 10);
 }
 
-echo(str("Bore = ", 2 * inner_r, " mm (lens ", lens_d, " + liner, minus grip)"));
+echo(bore_d > 0 ? str("Bore = ", bore_d, " mm (bore_d override)")
+                 : str("Bore = ", 2 * inner_r, " mm (lens ", lens_d, " + liner, minus grip)"));
 echo(str("Snap opening = ", 2 * inner_r * sin((360 - wrap) / 2), " mm"));
 echo(str("Shoe top is ", plat_top - lens_r, " mm above the lens surface"));
