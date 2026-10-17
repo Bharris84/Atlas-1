@@ -14,12 +14,15 @@ For the 1/4"-20 mount, `quarter20_style` picks how the thread is made:
 - `nut`: a captive 1/4"-20 hex nut that slides in from the back face.
 - `tap`: a #7 (5.1 mm) pilot hole that you tap yourself.
 
+With `cable_tie = true` (the default), one ear gets a zip-tie slot for anchoring a power cord.
+
 ## Usage
 
 1. Use calipers to measure the barrel where the ring will sit. Pick a spot that doesn't rotate, never the zoom or focus ring. Set `lens_d` to that measurement. The presets are Canon's maximum diameters, so treat them only as a starting point.
-2. Open the file in OpenSCAD and use the Customizer to set the mount type and style. Then set `part = "plate"` and export an STL.
-3. Print in PETG, ASA or ABS, with 4+ perimeters and 30–40% infill. Print both halves split-face down; the plate layout already does this.
-4. Line the bore with 1 mm felt or rubber tape. Then bolt the halves together with 2× M4×16 socket-head screws and nuts. The `clamp_gap` setting makes the halves squeeze the liner as you tighten.
+2. Print `part = "fit_test"` first. It's a thin slice of both halves with no mount on top, so it prints quickly. Bolt it on with the liner in place. If it's loose or won't close, adjust `lens_d` (or `liner_t`) and test again.
+3. Open the file in OpenSCAD and use the Customizer to set the mount type and style. Then set `part = "plate"` and export an STL.
+4. Print in PETG, ASA or ABS, with 4+ perimeters and 30–40% infill. PLA works for light loads that stay out of heat; don't overtighten the screws. Print both halves split-face down; the plate layout already does this.
+5. Line the bore with 1 mm felt or rubber tape. Then bolt the halves together with 2× M4×16 socket-head screws and nuts. The `clamp_gap` setting makes the halves squeeze the liner as you tighten.
 
 From the command line:
 
